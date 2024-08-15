@@ -1,25 +1,41 @@
 import socket
 import ssl
 
+HTTP_SCHEMES = ["http", "https"]
+
 class URL:
     def __init__(self, url):
-        self.scheme, url = url.split("://", 1)
-        # make sure correct scheme
-        assert self.scheme in ["http", "https"]
-        # add / if not present for path
-        if "/" not in url:
-            url += "/"
-        self.host, url = url.split("/", 1)
-        self.path = "/" + url
-        if ":" in self.host:
-            self.host, port = self.host.split(":", 1)
-            self.port = int(port)
-        elif self.scheme == "http":
-            self.port = 80
-        elif self.scheme == "https":
-            self.port = 443
+        self.scheme, url = url.split(":", 1)
+        if url.startswith('//'):
+            url = url[2:]
+        
+
+        if self.scheme in HTTP_SCHEMES:
+            # add / if not present for path
+            if "/" not in url:
+                url += "/"
+            self.host, url = url.split("/", 1)
+            self.path = "/" + url
+            if ":" in self.host:
+                self.host, port = self.host.split(":", 1)
+                self.port = int(port)
+            elif self.scheme == "http":
+                self.port = 80
+            elif self.scheme == "https":
+                self.port = 443
+        else:
+            self.host = url
+
 
     def request(self):
+        if self.scheme in HTTP_SCHEMES:
+            return self.make_http_request()
+        elif self.scheme == 'file':
+            return self.make_file_request()
+        elif self.scheme == 'data':
+            return self.make_data_request()
+
+    def make_http_request(self):
         s = socket.socket(
                 family=socket.AF_INET,
                 type=socket.SOCK_STREAM,
@@ -31,8 +47,10 @@ class URL:
         # connect to url
         s.connect((self.host, self.port))
         # create GET request
-        request = f"GET {self.path} HTTP/1.0\r\n"
-        request += f"Host: {self.host}\r\n\r\n"
+        request = f"GET {self.path} HTTP/1.1\r\n"
+        request += f"Host: {self.host}\r\n"
+        request += f"Connection: close\r\n"
+        request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
         # encode request as bytes to send
         s.send(request.encode("utf8"))
         # read all responses into var
@@ -58,3 +76,11 @@ class URL:
         s.close()
         return content
 
+    def make_file_request(self):
+        file = open(self.host, "r")
+        return file.read()
+
+    def make_data_request(self):
+        # ex: full url "data:text/html,Hello World!"
+        form, message = self.host.split(",", 1)
+        return message

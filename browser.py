@@ -1,5 +1,7 @@
 import url
 
+DEFAULT_FILE = 'file://C:/Users/ibbya/Documents/recurse/browser/test.txt'
+
 def show(body):
     in_tag = False
     for c in body:
@@ -16,4 +18,8 @@ def load(url):
 
 if __name__ == "__main__":
     import sys
-    load(url.URL(sys.argv[1]))
+    if not len(sys.argv) > 1:
+        arg = DEFAULT_FILE
+    else:
+        arg = sys.argv[1]
+    load(url.URL(arg))
