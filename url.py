@@ -1,14 +1,14 @@
 import socket
 import ssl
 
-HTTP_SCHEMES = ["http", "https"]
+HTTP_SCHEMES = ["http", "https", "view-source"]
 
 class URL:
     def __init__(self, url):
         self.scheme, url = url.split(":", 1)
+        # for http schemes
         if url.startswith('//'):
             url = url[2:]
-        
 
         if self.scheme in HTTP_SCHEMES:
             # add / if not present for path
@@ -25,7 +25,6 @@ class URL:
                 self.port = 443
         else:
             self.host = url
-
 
     def request(self):
         if self.scheme in HTTP_SCHEMES:
@@ -84,3 +83,4 @@ class URL:
         # ex: full url "data:text/html,Hello World!"
         form, message = self.host.split(",", 1)
         return message
+    
