@@ -23,12 +23,12 @@ CHARACTER_REF_MAP = {
     "deg": "°",	
 }
 
-def show(body, show_html = False):
+def show(body):
     in_tag = False
     in_character_reference = False 
     saved_chars = ""
     for c in body:
-        if in_tag and not show_html:
+        if in_tag:
             if c == ">":
                 in_tag = False
         elif in_character_reference:
@@ -43,7 +43,7 @@ def show(body, show_html = False):
                 saved_chars = ""
             else:
                 saved_chars += c
-        elif c == "<" and not show_html:
+        elif c == "<" :
             in_tag = True
         elif c == "&":
             in_character_reference = True 
@@ -61,7 +61,10 @@ def load(input):
     print(input)
     request = url.URL(input)
     body = request.request()
-    show(body, is_view_source)
+    if is_view_source:
+        print(body)
+    else:
+        show(body)
 
 if __name__ == "__main__":
     import sys
