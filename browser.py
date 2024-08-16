@@ -28,15 +28,15 @@ def show(body):
     in_character_reference = False 
     saved_chars = ""
     for c in body:
+        if in_character_reference and c in END_CHARACTER_REF:
+            in_character_reference = False
+            print(f"&{saved_chars}", end="")
+            saved_chars = ""
         if in_tag:
             if c == ">":
                 in_tag = False
         elif in_character_reference:
-            if c in END_CHARACTER_REF:
-                in_character_reference = False
-                print(f"&{saved_chars}{c}", end="")
-                saved_chars = ""
-            elif c == ";":
+            if c == ";":
                 in_character_reference = False
                 has_reference = saved_chars in CHARACTER_REF_MAP
                 print(CHARACTER_REF_MAP[saved_chars] if has_reference else f"&{saved_chars};", end="")
