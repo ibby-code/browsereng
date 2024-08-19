@@ -2,7 +2,7 @@ import socket
 import ssl
 
 HTTP_SCHEMES = ["http", "https", "view-source"]
-
+REDIRECT_LIMIT = 5
 
 class URL:
     def __init__(self, url):
@@ -36,7 +36,7 @@ class URL:
         elif self.scheme == "data":
             return self.make_data_request()
 
-    def make_http_request(self):
+    def make_http_request(self, redirect = 0):
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -47,7 +47,7 @@ class URL:
                 ctx = ssl.create_default_context()
                 self.socket = ctx.wrap_socket(self.socket, server_hostname=self.host)
             # connect to url
-        self.socket.connect((self.host, self.port))
+            self.socket.connect((self.host, self.port))
         # create GET request
         request = f"GET {self.path} HTTP/1.1\r\n"
         request += f"Host: {self.host}\r\n"
@@ -67,6 +67,23 @@ class URL:
             header, value = line.split(":", 1)
             response_headers[header.casefold()] = value.strip()
             line = response.readline()
+
+        assert status.isnumeric()
+        status = int(status)
+    
+        # handle redirects in 300 range
+        if status > 299 and status < 400 and 'location' in response_headers and redirect < REDIRECT_LIMIT:
+            location = response_headers['location']
+            redirect_url = URL(location)
+            print(f"redirect {redirect} to {location}")
+            if self.can_use_same_socket(redirect_url):
+                self.path = redirect_url.path 
+                return self.make_http_request(redirect = redirect + 1)
+            else:
+                return redirect_url.make_http_request(redirect = redirect + 1)
+        elif status > 299 and status < 400 and redirect > REDIRECT_LIMIT:
+            location = response_headers['location']
+            return f"Redirect loop detected! Last redirect is to :{location}"
 
         # fail unsupported headers
         assert "transfer-encoding" not in response_headers
@@ -88,3 +105,6 @@ class URL:
         # ex: full url "data:text/html,Hello World!"
         form, message = self.host.split(",", 1)
         return message
+
+    def can_use_same_socket(self, urlB):
+        return self.host == urlB.host and self.port == urlB.port
