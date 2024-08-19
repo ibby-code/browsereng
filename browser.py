@@ -27,10 +27,11 @@ def show(body):
     in_tag = False
     in_character_reference = False 
     saved_chars = ""
+    display = ""
     for c in body:
         if in_character_reference and c in END_CHARACTER_REF:
             in_character_reference = False
-            print(f"&{saved_chars}", end="")
+            display += f"&{saved_chars}"
             saved_chars = ""
         if in_tag:
             if c == ">":
@@ -39,7 +40,7 @@ def show(body):
             if c == ";":
                 in_character_reference = False
                 has_reference = saved_chars in CHARACTER_REF_MAP
-                print(CHARACTER_REF_MAP[saved_chars] if has_reference else f"&{saved_chars};", end="")
+                display += CHARACTER_REF_MAP[saved_chars] if has_reference else f"&{saved_chars};"
                 saved_chars = ""
             else:
                 saved_chars += c
@@ -48,9 +49,10 @@ def show(body):
         elif c == "&":
             in_character_reference = True 
         else:
-            print(c, end="")
+            display += c
     if saved_chars:
-        print(f"&{saved_chars}", end="")
+        display += f"&{saved_chars}"
+    return display
 
 def load(input):
     is_view_source = False
@@ -58,13 +60,12 @@ def load(input):
         is_view_source = True
         input = input[len(VIEW_SOURCE):]
 
-    print(input)
     request = url.URL(input)
     body = request.request()
     if is_view_source:
-        print(body)
+        return body
     else:
-        show(body)
+        return show(body)
 
 if __name__ == "__main__":
     import sys
@@ -72,4 +73,4 @@ if __name__ == "__main__":
         arg = DEFAULT_FILE
     else:
         arg = sys.argv[1]
-    load(arg)
+    print(load(arg))
