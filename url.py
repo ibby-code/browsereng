@@ -3,11 +3,13 @@ import ssl
 
 HTTP_SCHEMES = ["http", "https", "view-source"]
 
+
 class URL:
     def __init__(self, url):
+        self.socket = None
         self.scheme, url = url.split(":", 1)
         # for http schemes
-        if url.startswith('//'):
+        if url.startswith("//"):
             url = url[2:]
 
         if self.scheme in HTTP_SCHEMES:
@@ -29,31 +31,31 @@ class URL:
     def request(self):
         if self.scheme in HTTP_SCHEMES:
             return self.make_http_request()
-        elif self.scheme == 'file':
+        elif self.scheme == "file":
             return self.make_file_request()
-        elif self.scheme == 'data':
+        elif self.scheme == "data":
             return self.make_data_request()
 
     def make_http_request(self):
-        s = socket.socket(
+        if not self.socket:
+            self.socket = socket.socket(
                 family=socket.AF_INET,
                 type=socket.SOCK_STREAM,
                 proto=socket.IPPROTO_TCP,
-        )
-        if self.scheme == "https":
-            ctx = ssl.create_default_context()
-            s = ctx.wrap_socket(s, server_hostname=self.host)
-        # connect to url
-        s.connect((self.host, self.port))
+            )
+            if self.scheme == "https":
+                ctx = ssl.create_default_context()
+                self.socket = ctx.wrap_socket(self.socket, server_hostname=self.host)
+            # connect to url
+        self.socket.connect((self.host, self.port))
         # create GET request
         request = f"GET {self.path} HTTP/1.1\r\n"
         request += f"Host: {self.host}\r\n"
-        request += f"Connection: close\r\n"
         request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
         # encode request as bytes to send
-        s.send(request.encode("utf8"))
+        self.socket.send(request.encode("utf8"))
         # read all responses into var
-        response = s.makefile("r", encoding="utf8", newline="\r\n")
+        response = self.socket.makefile("r", encoding="utf8", newline="\r\n")
 
         statusline = response.readline()
         version, status, explanation = statusline.split(" ", 2)
@@ -70,9 +72,12 @@ class URL:
         assert "transfer-encoding" not in response_headers
         assert "content-encoding" not in response_headers
 
-        # everything else is content
-        content = response.read()
-        s.close()
+        # respect content-length
+        if "content-length" in response_headers:
+            content_length = response_headers["content-length"]
+            content = response.read(int(content_length))
+        else:
+            content = response.read()
         return content
 
     def make_file_request(self):
@@ -83,4 +88,3 @@ class URL:
         # ex: full url "data:text/html,Hello World!"
         form, message = self.host.split(",", 1)
         return message
-    
