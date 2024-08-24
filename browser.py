@@ -81,57 +81,89 @@ class Browser:
     
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c in self.display_list:
+        for x, y, c, f in self.display_list:
             if y > self.scroll_offset + HEIGHT: continue
             if y + VSTEP < self.scroll_offset: continue
-            self.canvas.create_text(x, y - self.scroll_offset, text=c, anchor="nw")
+            self.canvas.create_text(x, y - self.scroll_offset, text=c, font=f, anchor="nw")
     
     def scroll(self, offset, e):
         self.scroll_offset = max(0, self.scroll_offset + offset)
         self.draw()
 
-def layout(text):
-    font = tkinter.font.Font()
+def layout(tokens):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
-    for word in text.split():
-        text_width = font.measure(word)
-        if cursor_x + text_width > WIDTH - HSTEP:
-            cursor_x = HSTEP
-            cursor_y += font.metrics("linespace") * 1.25
-        display_list.append((cursor_x, cursor_y, word))
-        cursor_x += text_width + font.measure(" ") 
+    weight = "normal"
+    style = "roman"
+    ancestor_style = []
+    ancestor_weight = []
+    for tok in tokens:
+        if isinstance(tok, Text):
+            for word in tok.text.split():
+                font = tkinter.font.Font(
+                    size=16,
+                    weight=weight,
+                    slant=style,
+                )
+                text_width = font.measure(word)
+                if cursor_x + text_width > WIDTH - HSTEP:
+                    cursor_x = HSTEP
+                    cursor_y += font.metrics("linespace") * 1.25
+                display_list.append((cursor_x, cursor_y, word, font))
+                cursor_x += text_width + font.measure(" ") 
+        else:
+            match tok.tag:
+                case "i":
+                    ancestor_style.append(style)
+                    style = "italic"
+                case "/i":
+                    style = ancestor_style.pop()
+                case "b":
+                    ancestor_weight.append(weight)
+                    weight = "bold"
+                case "/b":
+                    weight = ancestor_weight.pop()
+
     return display_list
 
 def lex(body):
     in_tag = False
     in_character_reference = False 
     saved_chars = ""
-    display = ""
+    display = [] 
     for c in body:
         if in_character_reference and c in END_CHARACTER_REF:
             in_character_reference = False
-            display += f"&{saved_chars}"
+            display.append(Text(f"&{saved_chars}"))
             saved_chars = ""
         if in_tag:
             if c == ">":
                 in_tag = False
+                display.append(Tag(saved_chars))
+                saved_chars = ""
+            else:
+                saved_chars += c
         elif in_character_reference:
             if c == ";":
                 in_character_reference = False
                 has_reference = saved_chars in CHARACTER_REF_MAP
-                display += CHARACTER_REF_MAP[saved_chars] if has_reference else f"&{saved_chars};"
+                display.append(Text(CHARACTER_REF_MAP[saved_chars] if has_reference else f"&{saved_chars};"))
                 saved_chars = ""
             else:
                 saved_chars += c
         elif c == "<" :
             in_tag = True
+            display.append(Text(saved_chars))
+            saved_chars = ""
         elif c == "&":
             in_character_reference = True 
+            display.append(Text(saved_chars))
+            saved_chars = ""
         else:
-            display += c
+            saved_chars += c
     if saved_chars:
-        display += f"&{saved_chars}"
+        display.append(Text(f"&{saved_chars}"))
+    print(display)
     return display
 
 if __name__ == "__main__":
