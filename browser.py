@@ -1,3 +1,4 @@
+import tkinter
 import url
 
 DEFAULT_FILE = 'file://C:/Users/ibbya/Documents/recurse/browser/test.txt'
@@ -22,8 +23,40 @@ CHARACTER_REF_MAP = {
     "euro": "€",	
     "deg": "°",	
 }
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
 
-def show(body):
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(
+            self.window,
+            width=WIDTH,
+            height=HEIGHT
+        )
+        self.canvas.pack()
+    
+    def load(self, input):
+        is_view_source = False
+        if input.startswith(VIEW_SOURCE):
+            is_view_source = True
+            input = input[len(VIEW_SOURCE):]
+
+        request = url.URL(input)
+        body = request.request()
+        content = body if is_view_source else lex(body)
+        self.draw(content)
+    
+    def draw(self, content):
+        cursor_x, cursor_y = HSTEP, VSTEP
+        for c in content:
+            self.canvas.create_text(cursor_x, cursor_y, text=c)
+            cursor_x += HSTEP
+            if cursor_x + HSTEP > WIDTH:
+                cursor_x = HSTEP
+                cursor_y += VSTEP
+
+def lex(body):
     in_tag = False
     in_character_reference = False 
     saved_chars = ""
@@ -54,23 +87,11 @@ def show(body):
         display += f"&{saved_chars}"
     return display
 
-def load(input):
-    is_view_source = False
-    if input.startswith(VIEW_SOURCE):
-        is_view_source = True
-        input = input[len(VIEW_SOURCE):]
-
-    request = url.URL(input)
-    body = request.request()
-    if is_view_source:
-        return body
-    else:
-        return show(body)
-
 if __name__ == "__main__":
     import sys
     if not len(sys.argv) > 1:
         arg = DEFAULT_FILE
     else:
         arg = sys.argv[1]
-    print(load(arg))
+    Browser().load(arg)
+    tkinter.mainloop()

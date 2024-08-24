@@ -73,6 +73,7 @@ class URL:
     
         # handle redirects in 300 range
         if status > 299 and status < 400 and 'location' in response_headers and redirect < REDIRECT_LIMIT:
+            response.close()
             location = response_headers['location']
             redirect_url = URL(location)
             print(f"redirect {redirect} to {location}")
@@ -82,6 +83,7 @@ class URL:
             else:
                 return redirect_url.make_http_request(redirect = redirect + 1)
         elif status > 299 and status < 400 and redirect > REDIRECT_LIMIT:
+            response.close()
             location = response_headers['location']
             return f"Redirect loop detected! Last redirect is to :{location}"
 
@@ -91,10 +93,15 @@ class URL:
 
         # respect content-length
         if "content-length" in response_headers:
-            content_length = response_headers["content-length"]
-            content = response.read(int(content_length))
+            content_length = int(response_headers["content-length"])
+            try:
+                # TODO investiage why this is needed
+                content = response.read(content_length // 8) #content_length
+            except Exception as e:
+                print(f"fail {repr(e)}")
         else:
             content = response.read()
+        response.close()
         return content
 
     def make_file_request(self):
