@@ -1,3 +1,4 @@
+import time
 import tkinter
 import url
 
@@ -28,6 +29,7 @@ HSTEP, VSTEP = 13, 18
 
 class Browser:
     def __init__(self):
+        self.cache = {}
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window,
@@ -37,14 +39,25 @@ class Browser:
         self.canvas.pack()
     
     def load(self, input):
+        if input in self.cache:
+            content, store_time, max_age = self.cache[input]
+            print(f"retrieving at {store_time} with {max_age} at {time.time()}")
+            if store_time + max_age > time.time():
+                return content
+            else:
+                del self.cache[input]
         is_view_source = False
+        link = input
         if input.startswith(VIEW_SOURCE):
             is_view_source = True
-            input = input[len(VIEW_SOURCE):]
+            link = input[len(VIEW_SOURCE):]
 
-        request = url.URL(input)
-        body = request.request()
+        request = url.URL(link)
+        body, cache_time = request.request()
         content = body if is_view_source else lex(body)
+        if cache_time > 0:
+            print(f"storing at {time.time()} with {cache_time}")
+            self.cache[input] = (content, time.time(), cache_time)
         self.draw(content)
     
     def draw(self, content):
@@ -93,5 +106,6 @@ if __name__ == "__main__":
         arg = DEFAULT_FILE
     else:
         arg = sys.argv[1]
-    Browser().load(arg)
+    b = Browser()
+    b.load(arg)
     tkinter.mainloop()

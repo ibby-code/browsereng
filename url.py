@@ -29,6 +29,7 @@ class URL:
             self.host = url
 
     def request(self):
+        """Returns tuple with response and cache time"""
         if self.scheme in HTTP_SCHEMES:
             return self.make_http_request()
         elif self.scheme == "file":
@@ -95,23 +96,34 @@ class URL:
         if "content-length" in response_headers:
             content_length = int(response_headers["content-length"])
             try:
-                # TODO investiage why this is needed
+                # TODO investigate why this is needed
                 content = response.read(content_length // 8) #content_length
             except Exception as e:
                 print(f"fail {repr(e)}")
         else:
             content = response.read()
+
+        # get time content should be cached
+        cache_time = 0
+        if "cache-control" in response_headers:
+            cache_directives = response_headers["cache-control"].split(',')
+            for directive in cache_directives:
+                if directive.casefold().startswith('max-age'):
+                    cache_time = int(directive.split('=')[1])
+                elif directive.casefold() == 'nostore':
+                    cache_time = 0
+                    break
         response.close()
-        return content
+        return content, cache_time
 
     def make_file_request(self):
         file = open(self.host, "r")
-        return file.read()
+        return file.read(), 0
 
     def make_data_request(self):
         # ex: full url "data:text/html,Hello World!"
         form, message = self.host.split(",", 1)
-        return message
+        return message, 0
 
     def can_use_same_socket(self, urlB):
         return self.host == urlB.host and self.port == urlB.port
