@@ -95,11 +95,8 @@ class URL:
         # respect content-length
         if "content-length" in response_headers:
             content_length = int(response_headers["content-length"])
-            try:
-                # TODO investigate why this is needed
-                content = response.read(content_length // 8) #content_length
-            except Exception as e:
-                print(f"fail {repr(e)}")
+            # TODO investigate why this doesn't work for large values 
+            content = response.read(content_length) 
         else:
             content = response.read()
 
