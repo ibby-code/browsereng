@@ -1,3 +1,4 @@
+import math
 import time
 import tkinter
 import tkinter.font
@@ -30,6 +31,8 @@ CHARACTER_REF_MAP = {
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
+URL_BAR_HEIGHT = 20
+URL_BAR_WIDTH = 600
 
 @dataclass
 class Text:
@@ -48,6 +51,7 @@ class Browser:
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
         self.scroll_offset = 0
+        self.url_value = tkinter.StringVar()
         self.display_list = []
         self.canvas = tkinter.Canvas(
             self.window,
@@ -55,6 +59,7 @@ class Browser:
             height=HEIGHT
         )
         self.canvas.pack()
+        self.draw_url_bar()
     
     def load(self, input):
         if input in self.cache:
@@ -72,59 +77,81 @@ class Browser:
 
         request = url.URL(link)
         body, cache_time = request.request()
-        content = body if is_view_source else lex(body)
+        tokens = [Text(body)] if is_view_source else lex(body)
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
-            self.cache[input] = (content, time.time(), cache_time)
-        self.display_list = layout(content)
+            self.cache[input] = (tokens, time.time(), cache_time)
+        self.display_list = Layout(tokens).display_list
         self.draw()
     
+    def load_url(self, e = None):
+        url_value = self.url_value.get() 
+        print(url_value)
+        if url_value:
+            self.load(url_value)
+    
+    def draw_url_bar(self):
+        url_entry = tkinter.Entry(self.window, textvariable=self.url_value, font=('Garamond', 10, 'normal'))
+        url_entry.bind("<Return>", self.load_url)
+        submit_button = tkinter.Button(self.window, text="Go", command=self.load_url)
+        self.canvas.create_window(HSTEP, VSTEP, window=url_entry, anchor="nw", height=URL_BAR_HEIGHT, width=URL_BAR_WIDTH)
+        self.canvas.create_window(HSTEP + URL_BAR_WIDTH + HSTEP, VSTEP, window=submit_button, anchor="nw", height=URL_BAR_HEIGHT)
+    
     def draw(self):
-        self.canvas.delete("all")
+        self.canvas.delete("body")
         for x, y, c, f in self.display_list:
             if y > self.scroll_offset + HEIGHT: continue
             if y + VSTEP < self.scroll_offset: continue
-            self.canvas.create_text(x, y - self.scroll_offset, text=c, font=f, anchor="nw")
+            self.canvas.create_text(x, y - self.scroll_offset, text=c, font=f, anchor="nw", tags='body')
     
     def scroll(self, offset, e):
         self.scroll_offset = max(0, self.scroll_offset + offset)
         self.draw()
 
-def layout(tokens):
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
-    weight = "normal"
-    style = "roman"
-    ancestor_style = []
-    ancestor_weight = []
-    for tok in tokens:
-        if isinstance(tok, Text):
-            for word in tok.text.split():
-                font = tkinter.font.Font(
-                    size=16,
-                    weight=weight,
-                    slant=style,
-                )
-                text_width = font.measure(word)
-                if cursor_x + text_width > WIDTH - HSTEP:
-                    cursor_x = HSTEP
-                    cursor_y += font.metrics("linespace") * 1.25
-                display_list.append((cursor_x, cursor_y, word, font))
-                cursor_x += text_width + font.measure(" ") 
+class Layout:
+    def __init__(self, tokens):
+        self.display_list = []
+        self.cursor_x = HSTEP
+        self.cursor_y = URL_BAR_HEIGHT + VSTEP * 2
+        self.style = {"weight": "normal", "style" : "roman", "size": 12}
+        self.ancestors = []
+        for tok in tokens:
+            self.token(tok)
+    
+    def token(self, token):
+        if isinstance(token, Text):
+            for word in token.text.split():
+                self.word(word)
         else:
-            match tok.tag:
+            match token.tag:
                 case "i":
-                    ancestor_style.append(style)
-                    style = "italic"
-                case "/i":
-                    style = ancestor_style.pop()
+                    self.ancestors.append(self.style.copy())
+                    self.style['style'] = "italic"
                 case "b":
-                    ancestor_weight.append(weight)
-                    weight = "bold"
-                case "/b":
-                    weight = ancestor_weight.pop()
+                    self.ancestors.append(self.style.copy())
+                    self.style['weight'] = "bold"
+                case "small":
+                    self.ancestors.append(self.style.copy())
+                    self.style['size'] -= 2  
+                case "big":
+                    self.ancestors.append(self.style.copy())
+                    self.style['size'] += 4  
+                case "/i" | "/b" | "/small" | "/big":
+                    self.style = self.ancestors.pop()
 
-    return display_list
+    def word(self, word):
+        font = tkinter.font.Font(
+            size=self.style['size'],
+            weight=self.style['weight'],
+            slant=self.style['style'],
+        )
+        text_width = font.measure(word)
+        if self.cursor_x + text_width > WIDTH - HSTEP:
+            self.cursor_x = HSTEP
+            self.cursor_y += font.metrics("linespace") * 1.25
+        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
+        self.cursor_x += text_width + font.measure(" ") 
+
 
 def lex(body):
     in_tag = False
@@ -163,7 +190,6 @@ def lex(body):
             saved_chars += c
     if saved_chars:
         display.append(Text(f"&{saved_chars}"))
-    print(display)
     return display
 
 if __name__ == "__main__":

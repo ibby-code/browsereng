@@ -4,3 +4,7 @@ Apples & Oranges
 I like <b>pizza</b> & <i>coffee</i> <div>!</div>
 &ibby; looks like a ref! 
 &<div>& </div>
+<small>so tiny <small> tiny <small> tiny </small></small></small>
+but back to normal
+then <big>bigger <big> bigger</big></big>
+and okay again
