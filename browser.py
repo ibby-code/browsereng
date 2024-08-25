@@ -104,10 +104,9 @@ class Browser:
         im = Image.open(HOME_IMAGE)
         im.thumbnail((HOME_BUTTON_WIDTH, URL_BAR_HEIGHT), Image.Resampling.LANCZOS)
         home_img = ImageTk.PhotoImage(im)
-        # trying to load home image and make home button work
         home_button = tkinter.Button(self.window, image=home_img, command=self.load_home_url)
+        # you must save a reference to tkinter image to avoid garbage collection
         home_button.image = home_img
-        home_button.pack()
         self.canvas.create_window(HSTEP, VSTEP, window=home_button, anchor="nw", width=HOME_BUTTON_WIDTH, height=URL_BAR_HEIGHT)
         self.canvas.create_window(HSTEP + HOME_BUTTON_WIDTH + HSTEP, VSTEP, window=url_entry, anchor="nw", height=URL_BAR_HEIGHT, width=URL_BAR_WIDTH)
         self.canvas.create_window(HSTEP + HOME_BUTTON_WIDTH + HSTEP + URL_BAR_WIDTH + HSTEP, VSTEP, window=submit_button, anchor="nw", height=URL_BAR_HEIGHT)
