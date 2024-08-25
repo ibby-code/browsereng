@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import partial
 from PIL import ImageTk, Image
 
-DEFAULT_FILE = 'file://C:/Users/ibbya/Documents/recurse/browser/test.txt'
+DEFAULT_FILE = 'file://test.txt'
 HOME_IMAGE = 'img/home.png'
 
 VIEW_SOURCE = 'view-source:'
