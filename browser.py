@@ -5,8 +5,10 @@ import tkinter.font
 import url
 from dataclasses import dataclass
 from functools import partial
+from PIL import ImageTk, Image
 
 DEFAULT_FILE = 'file://C:/Users/ibbya/Documents/recurse/browser/test.txt'
+HOME_IMAGE = 'img/home.png'
 
 VIEW_SOURCE = 'view-source:'
 END_CHARACTER_REF = ['<', '>', ' ', '\n']
@@ -33,6 +35,7 @@ HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 URL_BAR_HEIGHT = 20
 URL_BAR_WIDTH = 600
+HOME_BUTTON_WIDTH = 30 
 
 @dataclass
 class Text:
@@ -48,6 +51,7 @@ class Browser:
     def __init__(self):
         self.cache = {}
         self.window = tkinter.Tk()
+        self.window.title("CanYouBrowseIt")
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
         self.scroll_offset = 0
@@ -89,13 +93,24 @@ class Browser:
         print(url_value)
         if url_value:
             self.load(url_value)
+
+    def load_home_url(self):
+        self.load(DEFAULT_FILE)
     
     def draw_url_bar(self):
         url_entry = tkinter.Entry(self.window, textvariable=self.url_value, font=('Garamond', 10, 'normal'))
         url_entry.bind("<Return>", self.load_url)
         submit_button = tkinter.Button(self.window, text="Go", command=self.load_url)
-        self.canvas.create_window(HSTEP, VSTEP, window=url_entry, anchor="nw", height=URL_BAR_HEIGHT, width=URL_BAR_WIDTH)
-        self.canvas.create_window(HSTEP + URL_BAR_WIDTH + HSTEP, VSTEP, window=submit_button, anchor="nw", height=URL_BAR_HEIGHT)
+        im = Image.open(HOME_IMAGE)
+        im.thumbnail((HOME_BUTTON_WIDTH, URL_BAR_HEIGHT), Image.Resampling.LANCZOS)
+        home_img = ImageTk.PhotoImage(im)
+        # trying to load home image and make home button work
+        home_button = tkinter.Button(self.window, image=home_img, command=self.load_home_url)
+        home_button.image = home_img
+        home_button.pack()
+        self.canvas.create_window(HSTEP, VSTEP, window=home_button, anchor="nw", width=HOME_BUTTON_WIDTH, height=URL_BAR_HEIGHT)
+        self.canvas.create_window(HSTEP + HOME_BUTTON_WIDTH + HSTEP, VSTEP, window=url_entry, anchor="nw", height=URL_BAR_HEIGHT, width=URL_BAR_WIDTH)
+        self.canvas.create_window(HSTEP + HOME_BUTTON_WIDTH + HSTEP + URL_BAR_WIDTH + HSTEP, VSTEP, window=submit_button, anchor="nw", height=URL_BAR_HEIGHT)
     
     def draw(self):
         self.canvas.delete("body")
