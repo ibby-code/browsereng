@@ -36,6 +36,7 @@ SCROLL_STEP = 100
 URL_BAR_HEIGHT = 20
 URL_BAR_WIDTH = 600
 HOME_BUTTON_WIDTH = 30 
+LEADING_FACTOR = 1.25
 
 @dataclass
 class Text:
@@ -125,33 +126,48 @@ class Browser:
 class Layout:
     def __init__(self, tokens):
         self.display_list = []
+        self.line = []
         self.cursor_x = HSTEP
         self.cursor_y = URL_BAR_HEIGHT + VSTEP * 2
         self.style = {"weight": "normal", "style" : "roman", "size": 12}
         self.ancestors = []
         for tok in tokens:
             self.token(tok)
+        self.flush_line()
     
     def token(self, token):
         if isinstance(token, Text):
             for word in token.text.split():
                 self.word(word)
         else:
-            match token.tag:
-                case "i":
-                    self.ancestors.append(self.style.copy())
-                    self.style['style'] = "italic"
-                case "b":
-                    self.ancestors.append(self.style.copy())
-                    self.style['weight'] = "bold"
-                case "small":
-                    self.ancestors.append(self.style.copy())
-                    self.style['size'] -= 2  
-                case "big":
-                    self.ancestors.append(self.style.copy())
-                    self.style['size'] += 4  
-                case "/i" | "/b" | "/small" | "/big":
-                    self.style = self.ancestors.pop()
+            self.process_tag(token.tag)
+
+    def process_tag(self, tag):
+        match tag:
+            case "i":
+                self.ancestors.append(self.style.copy())
+                self.style['style'] = "italic"
+            case "b":
+                self.ancestors.append(self.style.copy())
+                self.style['weight'] = "bold"
+            case "small":
+                self.ancestors.append(self.style.copy())
+                self.style['size'] -= 2  
+            case "big":
+                self.ancestors.append(self.style.copy())
+                self.style['size'] += 4  
+            case "/i" | "/b" | "/small" | "/big":
+                self.style = self.ancestors.pop()
+            case "br":
+                self.flush_line()
+            case "p":
+                self.flush_line()
+                # margin b4 paragraph. will prob move to css
+                self.cursor_y += VSTEP
+            case "/p":
+                self.flush_line() 
+                # margin after the paragraph
+                self.cursor_y += VSTEP
 
     def word(self, word):
         font = tkinter.font.Font(
@@ -160,12 +176,25 @@ class Layout:
             slant=self.style['style'],
         )
         text_width = font.measure(word)
+        # if there is no horizontal space, write current line
         if self.cursor_x + text_width > WIDTH - HSTEP:
-            self.cursor_x = HSTEP
-            self.cursor_y += font.metrics("linespace") * 1.25
-        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
+            self.flush_line()
+        self.line.append((self.cursor_x, word, font))
         self.cursor_x += text_width + font.measure(" ") 
 
+    def flush_line(self):
+        """Calculates baseline, adds all text objects in one line to display_list"""
+        if not self.line: return
+        font_metrics = [font.metrics() for x, word, font in self.line]
+        max_ascent = max([metric["ascent"] for metric in font_metrics])
+        baseline = self.cursor_y + LEADING_FACTOR * max_ascent
+        for x, word, font in self.line:
+            y = baseline - font.metrics("ascent")
+            self.display_list.append((x, y, word, font))
+        max_descent = max([metric["descent"] for metric in font_metrics])
+        self.cursor_y = baseline + 1.25 * max_descent
+        self.cursor_x = HSTEP
+        self.line = []
 
 def lex(body):
     in_tag = False
