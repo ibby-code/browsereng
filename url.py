@@ -83,10 +83,10 @@ class URL:
                 return self.make_http_request(redirect = redirect + 1)
             else:
                 return redirect_url.make_http_request(redirect = redirect + 1)
-        elif status > 299 and status < 400 and redirect > REDIRECT_LIMIT:
+        elif status > 299 and status < 400 and redirect >= REDIRECT_LIMIT:
             response.close()
             location = response_headers['location']
-            return f"Redirect loop detected! Last redirect is to :{location}"
+            return (f"Redirect loop detected! Last redirect is to :{location}", 0)
 
         # fail unsupported headers
         assert "transfer-encoding" not in response_headers
