@@ -20,6 +20,10 @@ CHARACTER_REF_MAP = {
     "euro": "€",	
     "deg": "°",	
 }
+SELF_CLOSING_TAGS = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "param", "source", "track", "wbr",
+]
 
 @dataclass()
 class Node:
@@ -36,6 +40,7 @@ class Text(Node):
 @dataclass()
 class Element(Node):
     tag: str
+    attributes: dict[str, str]
 
     def __repr__(self):
         return f"<{self.tag}>"
@@ -46,20 +51,28 @@ class HTMLParser:
         self.unfinished = []
 
     def add_text(self, text):
+        if text.isspace(): return
         parent = self.unfinished[-1] if self.unfinished else None
         node = Text(parent, text)
         if parent:
             parent.children.append(node)
 
-    def add_tag(self, tag):
+    def add_tag(self, text):
+        tag, attributes = get_tag_attributes(text)
+        if tag.startswith("!"): return
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return
             node = self.unfinished.pop()
             parent = self.unfinished[-1]
             parent.children.append(node)
+        elif tag in SELF_CLOSING_TAGS:
+            # what if we start wit a self closing tag?
+            parent = self.unfinished[-1]
+            node = Element(parent, tag, attributes)
+            parent.children.append(node)
         else:
             parent = self.unfinished[-1] if self.unfinished else None
-            node = Element(parent, tag)
+            node = Element(parent, tag, attributes)
             self.unfinished.append(node)
     
     def finish(self):
@@ -111,6 +124,30 @@ class HTMLParser:
         if saved_chars:
             self.add_text(f"{saved_chars}")
         return self.finish() 
+
+def get_tag_attributes(text: str) -> tuple[str, dict[str, str]]:
+    parts = text.split(None, 1)
+    tag = parts[0].casefold()
+    key_buffer = ""
+    val_buffer = ""
+    in_quotes = False
+    attributes = {}
+    attr_string = parts[1] if len(parts) > 1 else ""
+    for c in attr_string:
+        if c.isspace() and not in_quotes and key_buffer:
+            attributes[key_buffer.casefold()] = ""
+            key_buffer = ""
+        elif c in ["'", "\""] and key_buffer: 
+            in_quotes = not in_quotes
+            if not in_quotes:
+                attributes[key_buffer.casefold()] = val_buffer
+                key_buffer = ""
+                val_buffer = ""
+        elif in_quotes:
+            val_buffer += c
+        elif not c.isspace() and c not in ["/", "="]:
+            key_buffer += c
+    return tag, attributes
 
 def print_tree(node, indent=0):
     print(" " * indent, node)
