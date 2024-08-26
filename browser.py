@@ -1,10 +1,11 @@
-import math
+import layout
+import html_parser
 import time
 import tkinter
 import tkinter.font
 import url
 from dataclasses import dataclass
-from enum import Enum
+from display_constants import *
 from functools import partial
 from PIL import ImageTk, Image
 
@@ -12,47 +13,6 @@ DEFAULT_FILE = 'file://test.txt'
 HOME_IMAGE = 'img/home.png'
 
 VIEW_SOURCE = 'view-source:'
-END_CHARACTER_REF = ['<', '>', ' ', '\n']
-CHARACTER_REF_MAP = {
-    "amp": "&",	
-    "lt": "<",	
-    "gt": ">",	
-    "quot": '"',	
-    "apos": "'",	
-    "nbsp": " ",
-    "ndash": "–",	
-    "mdash": "—",	
-    "copy": "©",	
-    "reg": "®",	
-    "trade": "™",	
-    "asymp": "≈",	
-    "ne": "≠",	
-    "pound": "£",	
-    "euro": "€",	
-    "deg": "°",	
-}
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
-SCROLL_STEP = 100
-URL_BAR_HEIGHT = 20
-URL_BAR_WIDTH = 600
-HOME_BUTTON_WIDTH = 30 
-LEADING_FACTOR = 1.25
-
-@dataclass
-class Text:
-    """Represent html text"""
-    text: str
-
-@dataclass
-class Tag:
-    """Represents a tag"""
-    tag: str
-
-class VerticalAlign(Enum):
-    CENTER  = 0
-    TOP = 1
-    BOTTOM = 2
 
 class Browser:
     def __init__(self):
@@ -89,11 +49,11 @@ class Browser:
 
         request = url.URL(link)
         body, cache_time = request.request()
-        tokens = [Text(body)] if is_view_source else lex(body)
+        tree = layout.Text(None, body) if is_view_source else html_parser.HTMLParser(body).parse()
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
-            self.cache[input] = (tokens, time.time(), cache_time)
-        self.display_list = Layout(tokens, self.font_cache).display_list
+            self.cache[input] = (tree, time.time(), cache_time)
+        self.display_list = layout.Layout(tree, self.font_cache).display_list
         self.draw()
     
     def load_url(self, e = None):
@@ -129,147 +89,6 @@ class Browser:
     def scroll(self, offset, e):
         self.scroll_offset = max(0, self.scroll_offset + offset)
         self.draw()
-
-class Layout:
-    def __init__(self, tokens, font_cache):
-        self.display_list = []
-        self.line = []
-        self.cursor_x = HSTEP
-        self.cursor_y = URL_BAR_HEIGHT + VSTEP * 2
-        self.style = {"weight": "normal", "style" : "roman", "size": 12, "vertical-align": VerticalAlign.CENTER}
-        self.ancestors = []
-        self.font_cache = font_cache
-        for tok in tokens:
-            self.token(tok)
-        self.flush_line()
-    
-    def token(self, token):
-        if isinstance(token, Text):
-            for word in token.text.split():
-                self.word(word)
-        else:
-            self.process_tag(token.tag)
-
-    def process_tag(self, tag):
-        match tag:
-            case "i":
-                self.ancestors.append(self.style.copy())
-                self.style['style'] = "italic"
-            case "b":
-                self.ancestors.append(self.style.copy())
-                self.style['weight'] = "bold"
-            case "small":
-                self.ancestors.append(self.style.copy())
-                self.style['size'] -= 2  
-            case "big":
-                self.ancestors.append(self.style.copy())
-                self.style['size'] += 4  
-            case "sup":
-                self.ancestors.append(self.style.copy())
-                self.style['vertical-align'] = VerticalAlign.TOP
-                self.style['size'] -= 4  
-            case "sub":
-                self.ancestors.append(self.style.copy())
-                self.style['vertical-align'] = VerticalAlign.BOTTOM
-                self.style['size'] -= 4  
-            case "/i" | "/b" | "/small" | "/big" | "/sup" | "/sub":
-                self.style = self.ancestors.pop()
-            case "br":
-                self.flush_line()
-            case "p":
-                self.flush_line()
-                # margin b4 paragraph. will prob move to css
-                self.cursor_y += VSTEP
-            case "/p":
-                self.flush_line() 
-                # margin after the paragraph
-                self.cursor_y += VSTEP
-    
-    def get_font(self):
-        key = (self.style['size'], self.style['weight'], self.style['style']) 
-        if key not in self.font_cache:
-            font = tkinter.font.Font(
-                size=key[0],
-                weight=key[1],
-                slant=key[2],
-            )
-            label = tkinter.Label(font=font)
-            self.font_cache[key] = (font, label)
-        return self.font_cache[key][0]
-
-    def word(self, word):
-        font =  self.get_font()
-        text_width = font.measure(word)
-        # if there is no horizontal space, write current line
-        if self.cursor_x + text_width > WIDTH - HSTEP:
-            self.flush_line()
-        self.line.append((self.cursor_x, word, font, self.style['vertical-align']))
-        # shouldn't be adding a space if its followed by a tag
-        self.cursor_x += text_width + font.measure(" ") 
-
-    def flush_line(self):
-        """Calculates baseline, adds all text objects in one line to display_list"""
-        if not self.line: return
-        font_metrics = [font.metrics() for x, word, font, align in self.line]
-        max_ascent = max([metric["ascent"] for metric in font_metrics])
-        max_descent = max([metric["descent"] for metric in font_metrics])
-        baseline = self.cursor_y + LEADING_FACTOR * max_ascent
-        for x, word, font, vAlign in self.line:
-            match vAlign:
-                case VerticalAlign.CENTER:
-                    y = baseline - font.metrics("ascent")
-                case VerticalAlign.TOP:
-                    y = baseline - max_ascent 
-                case VerticalAlign.BOTTOM:
-                    y = (baseline + max_descent) - font.metrics("linespace")
-            self.display_list.append((x, y, word, font))
-        self.cursor_y = baseline + 1.25 * max_descent
-        self.cursor_x = HSTEP
-        self.line = []
-
-def lex(body):
-    in_tag = False
-    in_character_reference = False 
-    saved_chars = ""
-    display = [] 
-    for c in body:
-        if in_character_reference and c in END_CHARACTER_REF:
-            in_character_reference = False
-            display.append(Text(f"&{saved_chars}"))
-            saved_chars = ""
-        if in_tag:
-            if c == ">":
-                in_tag = False
-                display.append(Tag(saved_chars))
-                saved_chars = ""
-            else:
-                saved_chars += c
-        elif in_character_reference:
-            if c == ";":
-                in_character_reference = False
-                has_reference = saved_chars in CHARACTER_REF_MAP
-                display.append(Text(CHARACTER_REF_MAP[saved_chars] if has_reference else f"&{saved_chars};"))
-                saved_chars = ""
-            else:
-                saved_chars += c
-        elif c == "<" :
-            in_tag = True
-            display.append(Text(saved_chars))
-            saved_chars = ""
-        elif c == "&":
-            in_character_reference = True 
-            display.append(Text(saved_chars))
-            saved_chars = ""
-        else:
-            saved_chars += c
-    # if we end while saving characters, spit them out 
-    if in_character_reference:
-        display.append(Text("&"))
-    elif in_tag:
-        display.append(Text("<"))
-    if saved_chars:
-        display.append(Text(f"{saved_chars}"))
-    return display
 
 if __name__ == "__main__":
     import sys

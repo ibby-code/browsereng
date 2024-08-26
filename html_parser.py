@@ -24,6 +24,10 @@ SELF_CLOSING_TAGS = [
     "area", "base", "br", "col", "embed", "hr", "img", "input",
     "link", "meta", "param", "source", "track", "wbr",
 ]
+HEAD_TAGS =[
+    "base", "basefont", "bgsound", "noscript",
+    "link", "meta", "title", "style", "script",
+] 
 
 @dataclass()
 class Node:
@@ -52,6 +56,7 @@ class HTMLParser:
 
     def add_text(self, text):
         if text.isspace(): return
+        self.add_missing_tags()
         parent = self.unfinished[-1] if self.unfinished else None
         node = Text(parent, text)
         if parent:
@@ -60,6 +65,7 @@ class HTMLParser:
     def add_tag(self, text):
         tag, attributes = get_tag_attributes(text)
         if tag.startswith("!"): return
+        self.add_missing_tags(tag)
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return
             node = self.unfinished.pop()
@@ -81,6 +87,25 @@ class HTMLParser:
             parent = self.unfinished[-1]
             parent.children.append(node)
         return self.unfinished.pop()
+    
+    def add_missing_tags(self, current_tag = None):
+        """Adds missing tags. Called implicit_tags in book."""
+        while True:
+            open_tags = [node.tag for node in self.unfinished]
+            # First tag needs to be HTML
+            if not open_tags and current_tag != "html":
+                self.add_tag("html")
+            # Second tag should be head, body or close html tag
+            elif open_tags == ["html"] and current_tag not in ["head", "body", "/html"]:
+                if current_tag in HEAD_TAGS:
+                    self.add_tag("head")
+                else:
+                    self.add_tag("body")
+            # Make sure we close the head tag if the current doesn't belong there
+            elif open_tags == ["html", "head"] and current_tag not in ["/head"] + HEAD_TAGS:
+                self.add_tag("/head")
+            else:
+                break
     
     def parse(self):
         in_tag = False
