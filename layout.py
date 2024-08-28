@@ -1,4 +1,5 @@
 import tkinter
+from dataclasses import dataclass, field
 from enum import Enum
 from html_parser import Element, Text
 from display_constants import *
@@ -11,6 +12,43 @@ BLOCK_ELEMENTS = [
     "figcaption", "main", "div", "table", "form", "fieldset",
     "legend", "details", "summary"
 ]
+
+@dataclass()
+class DrawText:
+    left: int
+    top: int
+    text: str
+    font: 'tkinter.font.Font'
+    bottom: int =  field(init=False)
+
+    def __post_init__(self):
+        self.bottom = self.top + self.font.metrics("linespace")
+
+    def execute(self, scroll, canvas, tags = []):
+        canvas.create_text(
+            self.left, self.top - scroll,
+            text=self.text,
+            font=self.font,
+            anchor="nw",
+            tags=tags
+        )
+
+@dataclass()
+class DrawRect:
+    left: int
+    top: int
+    right: int
+    bottom: int
+    color: str
+
+    def execute(self, scroll, canvas, tags = []):
+        canvas.create_rectangle(
+            self.left, self.top - scroll,
+            self.right, self.bottom - scroll,
+            width=0,
+            fill=self.color,
+            tags=tags
+        )
 
 class VerticalAlign(Enum):
     CENTER  = 0
@@ -57,9 +95,17 @@ class BlockLayout:
         self.y = None
         self.width = None
         self.height = None
-    
+
     def paint(self):
-        return self.display_list
+        cmds = []
+        if isinstance(self.node, Element) and self.node.tag == "pre":
+            x2, y2 = self.x + self.width, self.y + self.height
+            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            cmds.append(rect)
+        if self.layout_mode() == DisplayValue.INLINE:
+            for x, y, word, font in self.display_list:
+                cmds.append(DrawText(x, y, word, font))
+        return cmds
 
     def layout_mode(self):
         if isinstance(self.node, Text):

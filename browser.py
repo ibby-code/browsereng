@@ -78,19 +78,27 @@ class Browser:
         home_button = tkinter.Button(self.window, image=home_img, command=self.load_home_url)
         # you must save a reference to tkinter image to avoid garbage collection
         home_button.image = home_img
+        self.canvas.create_rectangle(
+            0, 0,
+            WIDTH, 2 * VSTEP + URL_BAR_HEIGHT,
+            width=0,
+            fill="#dedede",
+        )
         self.canvas.create_window(HSTEP, VSTEP, window=home_button, anchor="nw", width=HOME_BUTTON_WIDTH, height=URL_BAR_HEIGHT)
         self.canvas.create_window(HSTEP + HOME_BUTTON_WIDTH + HSTEP, VSTEP, window=url_entry, anchor="nw", height=URL_BAR_HEIGHT, width=URL_BAR_WIDTH)
         self.canvas.create_window(HSTEP + HOME_BUTTON_WIDTH + HSTEP + URL_BAR_WIDTH + HSTEP, VSTEP, window=submit_button, anchor="nw", height=URL_BAR_HEIGHT)
     
     def draw(self):
-        self.canvas.delete("body")
-        for x, y, c, f in self.display_list:
-            if y > self.scroll_offset + HEIGHT: continue
-            if y + VSTEP < self.scroll_offset: continue
-            self.canvas.create_text(x, y - self.scroll_offset, text=c, font=f, anchor="nw", tags='body')
+        content_tag = "content"
+        self.canvas.delete(content_tag)
+        for cmd in self.display_list:
+            if cmd.top > self.scroll_offset + HEIGHT: continue
+            if cmd.bottom < self.scroll_offset + URL_BAR_HEIGHT + 3 * VSTEP: continue
+            cmd.execute(self.scroll_offset, self.canvas, tags=[content_tag])
     
     def scroll(self, offset, e):
-        self.scroll_offset = max(0, self.scroll_offset + offset)
+        max_y = max(self.document.height + 3 * VSTEP + URL_BAR_HEIGHT - HEIGHT, 0)
+        self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
         self.draw()
 
 def paint_tree(layout_object, display_list):
