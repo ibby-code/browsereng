@@ -53,7 +53,10 @@ class Browser:
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
             self.cache[input] = (tree, time.time(), cache_time)
-        self.display_list = layout.Layout(tree, self.font_cache).display_list
+        self.document = layout.DocumentLayout(tree, self.font_cache)
+        self.document.layout()
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
         self.draw()
     
     def load_url(self, e = None):
@@ -89,6 +92,12 @@ class Browser:
     def scroll(self, offset, e):
         self.scroll_offset = max(0, self.scroll_offset + offset)
         self.draw()
+
+def paint_tree(layout_object, display_list):
+    display_list.extend(layout_object.paint())
+
+    for child in layout_object.children:
+        paint_tree(child, display_list)
 
 if __name__ == "__main__":
     import sys
