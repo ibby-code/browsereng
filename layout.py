@@ -72,7 +72,7 @@ class DocumentLayout:
         self.height = None
 
     def layout(self):
-        child = BlockLayout(self.node, self, None, self.font_cache)
+        child = BlockLayout([self.node], self, None, self.font_cache)
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
@@ -81,11 +81,13 @@ class DocumentLayout:
         self.height = child.height
 
     def paint(self):
-        return [];
+        return []
 
 class BlockLayout:
-    def __init__(self, node, parent, previous, font_cache):
-        self.node = node
+    def __init__(self, nodes, parent, previous, font_cache):
+        # anon block boxes
+        self.nodes = nodes
+        self.node = nodes[0]
         self.parent = parent
         self.previous = previous
         self.children = []
@@ -108,7 +110,7 @@ class BlockLayout:
         return cmds
 
     def layout_mode(self):
-        if isinstance(self.node, Text):
+        if isinstance(self.node, Text) or len(self.nodes) > 1:
             return DisplayValue.INLINE
         # default to block display if here are both
         elif any([isinstance(child, Element) and \
@@ -119,7 +121,10 @@ class BlockLayout:
             return DisplayValue.INLINE
         else:
             return DisplayValue.BLOCK
-
+    
+    def is_textlike_node(self, node):
+        return isinstance(node, Text) or node.tag in ['b', 'i', 'small', 'big', 'sub', 'sup']
+    
     def layout(self):
         self.x = self.parent.x
         self.width = self.parent.width
@@ -130,10 +135,24 @@ class BlockLayout:
         mode = self.layout_mode()
         if mode == DisplayValue.BLOCK:
             previous = None
+            block_nodes_buffer = []
             for child in self.node.children:
-                nxt = BlockLayout(child, self, previous, self.font_cache)
+                # hide the <head> tag
+                if isinstance(child, Element) and child.tag == "head": continue
+                if self.is_textlike_node(child):
+                    block_nodes_buffer.append(child)
+                    continue
+                elif block_nodes_buffer:
+                    previous = BlockLayout(block_nodes_buffer, self, previous, self.font_cache)
+                    self.children.append(previous)
+                    block_nodes_buffer = []
+                    
+                nxt = BlockLayout([child], self, previous, self.font_cache)
                 self.children.append(nxt)
                 previous = nxt
+            if block_nodes_buffer:
+                nxt = BlockLayout(block_nodes_buffer, self, previous, self.font_cache)
+                self.children.append(nxt)
         else:
             self.cursor_x = 0 
             self.cursor_y = 0
@@ -146,7 +165,8 @@ class BlockLayout:
             self.ancestors = []
 
             self.line = []
-            self.recurse(self.node)
+            for node in self.nodes:
+                self.recurse(node)
             self.flush_line()
         for child in self.children:
             child.layout()
