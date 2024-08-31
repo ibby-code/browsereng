@@ -32,6 +32,7 @@ HEAD_TAGS =[
 @dataclass()
 class Node:
     children: list["Node"] = field(kw_only=True, default_factory=list)
+    style: dict[str, str] = field(kw_only=True, default_factory=dict)
     parent: "Node"
 
 @dataclass()

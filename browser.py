@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from display_constants import *
 from functools import partial
 from PIL import ImageTk, Image
+from css_parser import CSSParser
 
 DEFAULT_FILE = 'file://test.txt'
 HOME_IMAGE = 'img/home.png'
@@ -50,6 +51,7 @@ class Browser:
         request = url.URL(link)
         body, cache_time = request.request()
         tree = layout.Text(None, body) if is_view_source else html_parser.HTMLParser(body).parse()
+        style(tree)
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
             self.cache[input] = (tree, time.time(), cache_time)
@@ -106,6 +108,14 @@ def paint_tree(layout_object, display_list):
 
     for child in layout_object.children:
         paint_tree(child, display_list)
+
+def style(node: html_parser.Node):
+    if isinstance(node, html_parser.Element) and "style" in node.attributes:
+        pairs = CSSParser(node.attributes["style"]).body()
+        for property, value in pairs.items():
+            node.style[property] = value
+    for child in node.children:
+        style(child)
 
 if __name__ == "__main__":
     import sys
