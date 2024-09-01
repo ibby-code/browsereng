@@ -5,7 +5,7 @@ HTTP_SCHEMES = ["http", "https", "view-source"]
 REDIRECT_LIMIT = 5
 
 class URL:
-    def __init__(self, url):
+    def __init__(self, url: str):
         self.socket = None
         self.scheme, url = url.split(":", 1)
         # for http schemes
@@ -27,6 +27,20 @@ class URL:
                 self.port = 443
         else:
             self.host = url
+    
+    def resolve(self, url: str):
+        if "://" in url: return URL(url)
+        if not url.startswith("/"):
+            dir, _ = self.path.rsplit("/", 1)
+            while url.startswith("../"):
+                _, url = url.split("/", 1)
+                if "/" in dir:
+                    dir, _ = dir.rsplit("/", 1)
+            url = dir + "/" + url
+        if url.startswith("//"):
+            return URL(self.scheme + ":" + url)
+        else:
+            return URL(self.scheme + "://" + self.host + ":" + str(self.port) + url)
 
     def request(self):
         """Returns tuple with response and cache time"""

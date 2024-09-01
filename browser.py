@@ -53,6 +53,15 @@ class Browser:
             if is_view_source
             else html_parser.HTMLParser(body).parse()
         )
+        links = [
+            node.attributes["href"]
+            for node in tree_to_list(tree, [])
+            if isinstance(node, html_parser.Element)
+            and node.tag == "link"
+            and node.attributes.get("rel") == "stylesheet"
+            and "href" in node.attributes
+        ]
+
         style(tree, DEFAULT_STYLE_SHEET.copy())
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
