@@ -177,7 +177,7 @@ def get_mock_socket(mock_socket_ctr, http_responses=[HTTP_RESPONSE]):
     mock_socket_ctr.return_value = mock_socket
     return_values = []
     for resp in http_responses:
-        return_values.append(mock_open(read_data=resp)())
+        return_values.append(mock_open(read_data=resp.encode("utf-8"))())
     mock_socket.makefile.side_effect = return_values
     return mock_socket
 
