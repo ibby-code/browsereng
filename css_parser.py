@@ -1,6 +1,8 @@
 import html_parser
 from dataclasses import dataclass
 
+type Selector = TagSelector | DescendantSelector
+
 @dataclass
 class TagSelector:
     tag: str
