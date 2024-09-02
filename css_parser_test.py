@@ -50,8 +50,32 @@ PARSE_TEST_CASES = [
         ],
     ),
     (
+        "multi-element style",
+        "li, p { color: red; }",
+        [
+            (TagSelector("li"), {"color": "red"}),
+            (TagSelector("p"), {"color": "red"}),
+        ],
+    ),
+    (
+        "multi-element style w/descendant ",
+        "li, li p { color: red; }",
+        [
+            (TagSelector("li"), {"color": "red"}),
+            (DescendantSelector(TagSelector("li"), TagSelector("p")), {"color": "red"}),
+        ],
+    ),
+    (
         "skips broken block",
         "h1 { display: block} p  color: white;  li {padding-left:2px;}",
+        [
+            (TagSelector("h1"), {"display": "block"}),
+            (TagSelector("li"), {"padding-left": "2px"}),
+        ],
+    ),
+    (
+        "skips media tags",
+        "h1 { display: block}\n @media (max-width:800px) {p  {color: white;}}\n  li {padding-left:2px;}",
         [
             (TagSelector("h1"), {"display": "block"}),
             (TagSelector("li"), {"padding-left": "2px"}),

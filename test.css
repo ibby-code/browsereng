@@ -1,0 +1,19 @@
+h1 p {color: red;}
+pre, code { hyphens: none; -webkit-hyphens: none; }
+pre { font-size: 18px; overflow: auto; padding-left: 2ex; }
+
+dt { margin-top: 1em; }
+dd { margin-bottom: 1em; }
+
+abbr { font-variant: small-caps; font-weight: bold; }
+
+blockquote { border-left: 1ex solid #eee; padding-left: 1ex; margin-left: 0; }
+
+footer { text-align: center; font: italic 60% serif; margin: 5em 0; }
+
+header, h1, strong { font-family: 'Vollkorn', 'Garamond', serif;}
+@media (prefers-color-scheme: light) {
+header, h1, strong {
+    color:black;
+}
+}

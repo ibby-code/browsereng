@@ -27,6 +27,20 @@ class URL:
                 self.port = 443
         else:
             self.host = url
+            self.port = 0
+            self.path = "/"
+    
+    def get_id(self):
+        return f"{self.scheme}{self.host}{self.port}{self.path}"
+
+    # eq and hash to allow use as key in dict
+    def __eq__(self, other):
+        if isinstance(other, URL):
+            return self.get_id() == other.get_id()
+        return NotImplemented
+
+    def __hash__(self):
+        return hash((self.get_id()))
     
     def resolve(self, url: str):
         if "://" in url: return URL(url)

@@ -40,13 +40,6 @@ class Browser:
         self.draw_url_bar()
 
     def load(self, input):
-        if input in self.cache:
-            content, store_time, max_age = self.cache[input]
-            print(f"retrieving at {store_time} with {max_age} at {time.time()}")
-            if store_time + max_age > time.time():
-                return content
-            else:
-                del self.cache[input]
         is_view_source = False
         link = input
         if input.startswith(VIEW_SOURCE):
@@ -54,7 +47,12 @@ class Browser:
             link = input[len(VIEW_SOURCE) :]
 
         request = url.URL(link)
-        body, cache_time = request.request()
+        cache_response = self.request_from_cache(request)
+        if cache_response:
+            body, cache_time = cache_response
+        else:
+            body, cache_time = request.request()
+            self.cache_request(request, body, cache_time)
         tree = (
             layout.Text(None, body)
             if is_view_source
@@ -69,23 +67,41 @@ class Browser:
             and "href" in node.attributes
         ]
         rules = DEFAULT_STYLE_SHEET.copy()
-        style(tree, sorted(rules, key=cascade_priority))
         for link in links:
             style_url = request.resolve(link)
             try:
-                css = style_url.request()
+                cached_response = self.request_from_cache(style_url)
+                if cached_response:
+                    css, cache_time = cached_response
+                else:
+                    css, cache_time = style_url.request()
+                self.cache_request(style_url, css, cache_time)
             except:
                 continue
-            rules.extend(CSSParser(css).parse())
+            new_rules = CSSParser(css).parse()
+            print(new_rules)
+            rules.extend(new_rules)
+        style(tree, sorted(rules, key=cascade_priority))
 
-        if cache_time > 0:
-            print(f"storing at {time.time()} with {cache_time}")
-            self.cache[input] = (tree, time.time(), cache_time)
         self.document = layout.DocumentLayout(tree, self.font_cache)
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
         self.draw()
+    
+    def request_from_cache(self, url: url.URL) -> tuple[str, int]|None:
+        if url in self.cache:
+            content, store_time, max_age = self.cache[url]
+            print(f"retrieving at {store_time} with {max_age} at {time.time()}")
+            if store_time + max_age > time.time():
+                return (content, 0)
+            else:
+                del self.cache[input]
+
+    def cache_request(self, url: url.URL, body: str, cache_time: int):
+        if cache_time > 0:
+            print(f"storing at {time.time()} with {cache_time}")
+            self.cache[url] = (body, time.time(), cache_time)
 
     def load_url(self, e=None):
         url_value = self.url_value.get()

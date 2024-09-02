@@ -55,9 +55,9 @@ class DrawRect:
         )
 
 class VerticalAlign(Enum):
-    CENTER  = 0
-    TOP = 1
-    BOTTOM = 2
+    BASELINE = 'baseline'
+    SUB = 'sub'
+    SUPER = 'super'
 
 class DisplayValue(Enum):
     BLOCK = 'block'
@@ -161,13 +161,12 @@ class BlockLayout:
         else:
             self.cursor_x = 0 
             self.cursor_y = 0
-            self.style = {
-                "weight": "normal",
-                "style" : "roman",
-                "size": 12,
-                "vertical-align": VerticalAlign.CENTER
-            }
-            self.ancestors = []
+            #self.style = {
+            #    "weight": "normal",
+            #    "style" : "roman",
+            #    "size": 12,
+            #    "vertical-align": VerticalAlign.BASELINE
+            #}
 
             self.line = []
             for node in self.nodes:
@@ -186,7 +185,7 @@ class BlockLayout:
                 self.word(tree, word)
         else:
             if tree.tag == "br":
-                self.flush()
+                self.flush_line()
             for child in tree.children:
                 self.recurse(child)
    
@@ -206,6 +205,8 @@ class BlockLayout:
         color = node.style["color"]
         weight = node.style["font-weight"]
         font_style = node.style["font-style"]
+        # should prob use stylesheet for this
+        vertical_align = node.style.get("vertical-align", VerticalAlign.BASELINE)
         if font_style == "normal": font_style = "roman"
         # assumes pixels
         size = int(float(node.style["font-size"][:-2]) * .75)
@@ -214,7 +215,7 @@ class BlockLayout:
         # if there is no horizontal space, write current line
         if self.cursor_x + text_width > self.width:
             self.flush_line()
-        self.line.append((self.cursor_x, word, font, color, self.style['vertical-align']))
+        self.line.append((self.cursor_x, word, font, color, vertical_align))
         # shouldn't be adding a space if its followed by a tag
         self.cursor_x += text_width + font.measure(" ") 
 
@@ -228,11 +229,11 @@ class BlockLayout:
         for rel_x, word, font, color, vAlign in self.line:
             x = self.x + rel_x
             match vAlign:
-                case VerticalAlign.CENTER:
+                case VerticalAlign.BASELINE:
                     y = self.y + baseline - font.metrics("ascent")
-                case VerticalAlign.TOP:
+                case VerticalAlign.SUPER:
                     y = self.y + baseline - max_ascent 
-                case VerticalAlign.BOTTOM:
+                case VerticalAlign.SUB:
                     y = self.y + (baseline + max_descent) - font.metrics("linespace")
             self.display_list.append((x, y, word, font, color))
         self.cursor_y = baseline + 1.25 * max_descent
