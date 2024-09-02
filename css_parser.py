@@ -1,11 +1,12 @@
 import html_parser
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 type Selector = TagSelector | DescendantSelector
 
 @dataclass
 class TagSelector:
     tag: str
+    priority:int = 1
 
     def matches(self, node: html_parser.Node):
         return isinstance(node, html_parser.Element) and self.tag == node.tag
@@ -14,6 +15,10 @@ class TagSelector:
 class DescendantSelector:
     ancestor: TagSelector
     descendant: TagSelector
+    priority: int =  field(init=False)
+
+    def __post_init__(self):
+        self.priority = self.ancestor.priority + self.descendant.priority
 
     def matches(self, node: html_parser.Node):
         if not self.descendant.matches(node): return False

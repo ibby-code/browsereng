@@ -10,11 +10,18 @@ from functools import partial
 from PIL import ImageTk, Image
 from css_parser import CSSParser, Selector
 
-DEFAULT_FILE = "file://test.txt"
+BG_DEFAULT_COLOR = "white"
+DEFAULT_FILE = "file://test.html"
 DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 HOME_IMAGE = "img/home.png"
 
 VIEW_SOURCE = "view-source:"
+INHERITED_PROPERTIES = {
+    "font-size": "16px",
+    "font-style": "normal",
+    "font-weight": "normal",
+    "color": "black",
+}
 
 
 class Browser:
@@ -28,7 +35,7 @@ class Browser:
         self.scroll_offset = 0
         self.url_value = tkinter.StringVar()
         self.display_list = []
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR)
         self.canvas.pack()
         self.draw_url_bar()
 
@@ -61,8 +68,16 @@ class Browser:
             and node.attributes.get("rel") == "stylesheet"
             and "href" in node.attributes
         ]
+        rules = DEFAULT_STYLE_SHEET.copy()
+        style(tree, sorted(rules, key=cascade_priority))
+        for link in links:
+            style_url = request.resolve(link)
+            try:
+                css = style_url.request()
+            except:
+                continue
+            rules.extend(CSSParser(css).parse())
 
-        style(tree, DEFAULT_STYLE_SHEET.copy())
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
             self.cache[input] = (tree, time.time(), cache_time)
@@ -151,15 +166,34 @@ def paint_tree(layout_object, display_list):
 
 
 def style(node: html_parser.Node, rules: list[tuple[Selector, dict[str, str]]]):
+    # pass down inherited or default values
+    for property, default_value in INHERITED_PROPERTIES.items():
+        if node.parent:
+            node.style[property] = node.parent.style[property]
+        else:
+            node.style[property] = default_value
+    # apply rules from CSS stylesheets
     for selector, body in rules:
         if not selector.matches(node):
             continue
         for prop, val in body.items():
             node.style[prop] = val
+    # apply rules from 'style' attribute
     if isinstance(node, html_parser.Element) and "style" in node.attributes:
         pairs = CSSParser(node.attributes["style"]).body()
         for property, value in pairs.items():
             node.style[property] = value
+    # compute actual values for percentages
+    node_font_size = node.style["font-size"]
+    if node_font_size.endswith("%"):
+        if node.parent:
+            parent_font_size = node.parent.style["font-size"]
+        else:
+            parent_font_size = INHERITED_PROPERTIES["font-size"]
+        node_pct = float(node_font_size[:-1]) / 100
+        parent_px = float(parent_font_size[:-2])
+        node.style["font-size"] = str(node_pct * parent_px) + "px"
+    # recursively style the rest of the tree
     for child in node.children:
         style(child, rules)
 
@@ -169,6 +203,10 @@ def tree_to_list(tree, list):
     for child in tree.children:
         tree_to_list(child, list)
     return list
+
+def cascade_priority(rule):
+    selector, body = rule
+    return selector.priority
 
 
 if __name__ == "__main__":

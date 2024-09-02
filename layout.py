@@ -13,12 +13,15 @@ BLOCK_ELEMENTS = [
     "legend", "details", "summary"
 ]
 
+TEXTLIKE_ELEMENTS = ['a', 'b', 'i', 'small', 'big', 'sub', 'sup']
+
 @dataclass()
 class DrawText:
     left: int
     top: int
     text: str
     font: 'tkinter.font.Font'
+    color: str
     bottom: int =  field(init=False)
 
     def __post_init__(self):
@@ -29,6 +32,7 @@ class DrawText:
             self.left, self.top - scroll,
             text=self.text,
             font=self.font,
+            fill=self.color,
             anchor="nw",
             tags=tags
         )
@@ -100,18 +104,14 @@ class BlockLayout:
 
     def paint(self):
         cmds = []
-#        if isinstance(self.node, Element) and self.node.tag == "pre":
-#            x2, y2 = self.x + self.width, self.y + self.height
-#            rect = DrawRect(self.x, self.y, x2, y2, "gray")
-#            cmds.append(rect)
         bgcolor = self.node.style.get("background-color", "transparent")
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
             rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmds.append(rect)
         if self.layout_mode() == DisplayValue.INLINE:
-            for x, y, word, font in self.display_list:
-                cmds.append(DrawText(x, y, word, font))
+            for x, y, word, font, color in self.display_list:
+                cmds.append(DrawText(x, y, word, font, color))
         return cmds
 
     def layout_mode(self):
@@ -128,7 +128,7 @@ class BlockLayout:
             return DisplayValue.BLOCK
     
     def is_textlike_node(self, node):
-        return isinstance(node, Text) or node.tag in ['b', 'i', 'small', 'big', 'sub', 'sup']
+        return isinstance(node, Text) or node.tag in TEXTLIKE_ELEMENTS 
     
     def layout(self):
         self.x = self.parent.x
@@ -183,53 +183,15 @@ class BlockLayout:
     def recurse(self, tree):
         if isinstance(tree, Text):
             for word in tree.text.split():
-                self.word(word)
+                self.word(tree, word)
         else:
-            self.open_tag(tree.tag)
+            if tree.tag == "br":
+                self.flush()
             for child in tree.children:
                 self.recurse(child)
-            self.close_tag(tree.tag)
-
-    def open_tag(self, tag):
-        match tag:
-            case "i":
-                self.ancestors.append(self.style.copy())
-                self.style['style'] = "italic"
-            case "b":
-                self.ancestors.append(self.style.copy())
-                self.style['weight'] = "bold"
-            case "small":
-                self.ancestors.append(self.style.copy())
-                self.style['size'] -= 2  
-            case "big":
-                self.ancestors.append(self.style.copy())
-                self.style['size'] += 4  
-            case "sup":
-                self.ancestors.append(self.style.copy())
-                self.style['vertical-align'] = VerticalAlign.TOP
-                self.style['size'] -= 4  
-            case "sub":
-                self.ancestors.append(self.style.copy())
-                self.style['vertical-align'] = VerticalAlign.BOTTOM
-                self.style['size'] -= 4  
-            case "br":
-                self.flush_line()
-            case "p":
-                self.flush_line()
-                # margin b4 paragraph. will prob move to css
-                self.cursor_y += VSTEP
-
-    def close_tag(self, tag):
-        match tag:
-           case "i" | "b" | "small" | "big" | "sup" | "sub":
-                self.style = self.ancestors.pop()
-           case "p":
-                self.flush_line() 
-                # margin after the paragraph
-                self.cursor_y += VSTEP
-    
-    def get_font(self):
-        key = (self.style['size'], self.style['weight'], self.style['style']) 
+   
+    def get_font(self, size, weight, font_style):
+        key = (size, weight, font_style)
         if key not in self.font_cache:
             font = tkinter.font.Font(
                 size=key[0],
@@ -240,24 +202,30 @@ class BlockLayout:
             self.font_cache[key] = (font, label)
         return self.font_cache[key][0]
 
-    def word(self, word):
-        font =  self.get_font()
+    def word(self, node, word):
+        color = node.style["color"]
+        weight = node.style["font-weight"]
+        font_style = node.style["font-style"]
+        if font_style == "normal": font_style = "roman"
+        # assumes pixels
+        size = int(float(node.style["font-size"][:-2]) * .75)
+        font =  self.get_font(size, weight, font_style)
         text_width = font.measure(word)
         # if there is no horizontal space, write current line
         if self.cursor_x + text_width > self.width:
             self.flush_line()
-        self.line.append((self.cursor_x, word, font, self.style['vertical-align']))
+        self.line.append((self.cursor_x, word, font, color, self.style['vertical-align']))
         # shouldn't be adding a space if its followed by a tag
         self.cursor_x += text_width + font.measure(" ") 
 
     def flush_line(self):
         """Calculates baseline, adds all text objects in one line to display_list"""
         if not self.line: return
-        font_metrics = [font.metrics() for x, word, font, align in self.line]
+        font_metrics = [font.metrics() for x, word, font, color, align in self.line]
         max_ascent = max([metric["ascent"] for metric in font_metrics])
         max_descent = max([metric["descent"] for metric in font_metrics])
         baseline = self.cursor_y + LEADING_FACTOR * max_ascent
-        for rel_x, word, font, vAlign in self.line:
+        for rel_x, word, font, color, vAlign in self.line:
             x = self.x + rel_x
             match vAlign:
                 case VerticalAlign.CENTER:
@@ -266,7 +234,7 @@ class BlockLayout:
                     y = self.y + baseline - max_ascent 
                 case VerticalAlign.BOTTOM:
                     y = self.y + (baseline + max_descent) - font.metrics("linespace")
-            self.display_list.append((x, y, word, font))
+            self.display_list.append((x, y, word, font, color))
         self.cursor_y = baseline + 1.25 * max_descent
         self.cursor_x = 0 
         self.line = []

@@ -1,2 +1,14 @@
 pre { background-color: gray; }
-
+a { color: blue; }
+i { font-style: italic; }
+b { font-weight: bold; }
+small { font-size: 90%; }
+big { font-size: 110%; }
+sup {
+    vertical-align: super;
+    font-size: 90%;
+}
+sub {
+    vertical-align: sub;
+    font-size: 90%;
+}
