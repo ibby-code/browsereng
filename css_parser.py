@@ -34,29 +34,6 @@ class CSSParser:
         self.style = style
         self.i = 0
     
-    def body(self):
-        pairs = {}
-        while self.i < len(self.style) and self.style[self.i] != "}":
-            try:
-                prop, val = self.pair()
-                pairs[prop] = val
-                self.whitespace()
-                # don't treat a missing ending ';' as an error
-                if self.i == len(self.style) or self.style[self.i] == "}":
-                    break
-                self.literal(';')
-                self.whitespace()
-            except Exception as e:
-                # debugging purposes
-                print(f"body error at {self.i}\nchar:{self.style[self.i]}\nstyle:{self.style}\npairs: {pairs}\nerror {e}")
-                why = self.ignore_until([";", "}"])
-                if why == ";":
-                    self.literal(";")
-                    self.whitespace()
-                else:
-                    break
-        return pairs
-
     def parse(self):
         rules = []
         while self.i < len(self.style):
@@ -95,6 +72,29 @@ class CSSParser:
                     break
                 
         return rules
+
+    def body(self):
+        pairs = {}
+        while self.i < len(self.style) and self.style[self.i] != "}":
+            try:
+                prop, val = self.pair()
+                pairs[prop] = val
+                self.whitespace()
+                # don't treat a missing ending ';' as an error
+                if self.i == len(self.style) or self.style[self.i] == "}":
+                    break
+                self.literal(';')
+                self.whitespace()
+            except Exception as e:
+                # debugging purposes
+                print(f"body error at {self.i}\nchar:{self.style[self.i]}\nstyle:{self.style}\npairs: {pairs}\nerror {e}")
+                why = self.ignore_until([";", "}"])
+                if why == ";":
+                    self.literal(";")
+                    self.whitespace()
+                else:
+                    break
+        return pairs
 
     def selector(self):
         out = TagSelector(self.word().casefold())
