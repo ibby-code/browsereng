@@ -134,11 +134,11 @@ class HTMLParser:
                     saved_chars += c
             elif c == "<" :
                 in_tag = True
-                self.add_text(saved_chars)
+                if saved_chars: self.add_text(saved_chars)
                 saved_chars = ""
             elif c == "&":
                 in_character_reference = True 
-                self.add_text(saved_chars)
+                if saved_chars: self.add_text(saved_chars)
                 saved_chars = ""
             else:
                 saved_chars += c
@@ -147,8 +147,7 @@ class HTMLParser:
             self.add_text("&")
         elif in_tag:
             self.add_text("<")
-        if saved_chars:
-            self.add_text(f"{saved_chars}")
+        if saved_chars: self.add_text(saved_chars)
         return self.finish() 
 
 def get_tag_attributes(text: str) -> tuple[str, dict[str, str]]:
