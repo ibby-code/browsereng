@@ -201,14 +201,17 @@ def style(node: html_parser.Node, rules: list[tuple[Selector, dict[str, str]]]):
             node.style[property] = value
     # compute actual values for percentages
     node_font_size = node.style["font-size"]
+    if node.parent:
+        parent_font_size = node.parent.style["font-size"]
+    else:
+        parent_font_size = INHERITED_PROPERTIES["font-size"]
     if node_font_size.endswith("%"):
-        if node.parent:
-            parent_font_size = node.parent.style["font-size"]
-        else:
-            parent_font_size = INHERITED_PROPERTIES["font-size"]
         node_pct = float(node_font_size[:-1]) / 100
         parent_px = float(parent_font_size[:-2])
         node.style["font-size"] = str(node_pct * parent_px) + "px"
+    elif node_font_size == "inherit":
+        node.style["font-size"] = parent_font_size
+
     # recursively style the rest of the tree
     for child in node.children:
         style(child, rules)

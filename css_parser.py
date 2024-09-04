@@ -29,6 +29,15 @@ class DescendantSelector:
             node = node.parent
         return False
 
+class SelectorParsingException(Exception):
+    pass
+
+class WordParsingException(Exception):
+    pass
+
+class LiteralParsingException(Exception):
+    pass
+
 class CSSParser:
     def __init__(self, style):
         self.style = style
@@ -42,28 +51,21 @@ class CSSParser:
                 selectors = self.selector()
                 # ignoring media tags for now
                 if isinstance(selectors[0], TagSelector) and selectors[0].tag == MEDIA_TAG:
-                    self.ignore_until("{")
-                    open_tags = 1
-                    while open_tags > 0 and self.i < len(self.style):
-                        self.i += 1
-                        stop = self.ignore_until("{}")
-                        if stop == "{":
-                            open_tags += 1
-                        elif stop == "}":
-                            open_tags -= 1
-                        else:
-                            break
-                    self.literal("}")
-                    continue
+                   self.ignore_block()
+                   continue
                 self.literal("{")
                 self.whitespace()
                 body = self.body()
                 self.literal("}")
                 for selector in selectors:
                     rules.append((selector, body))
-            except Exception as e:
+            except SelectorParsingException as e:
                 # debugging purposes
-                print(f"parse error at {self.i}\nchar:{self.style[self.i]}\nstyle:{self.style}\nrules: {rules}\nerror {e}")
+                print(f"selector exception at {self.i}\nchar:{self.style[self.i]}")
+                self.ignore_block()
+            except (WordParsingException, LiteralParsingException) as e:
+                # debugging purposes
+                print(f"parse error at {self.i}\nchar:{self.style[self.i]}\nerror {e}")
                 why = self.ignore_until([";", "}"])
                 if why == ";":
                     self.literal(";")
@@ -79,7 +81,6 @@ class CSSParser:
             try:
                 prop, val = self.pair()
                 pairs[prop] = val
-                self.whitespace()
                 # don't treat a missing ending ';' as an error
                 if self.i == len(self.style) or self.style[self.i] == "}":
                     break
@@ -87,7 +88,7 @@ class CSSParser:
                 self.whitespace()
             except Exception as e:
                 # debugging purposes
-                print(f"body error at {self.i}\nchar:{self.style[self.i]}\nstyle:{self.style}\npairs: {pairs}\nerror {e}")
+                print(f"body error at {self.i}\nchar:{self.style[self.i]}\npairs: {pairs}\nerror {e}")
                 why = self.ignore_until([";", "}"])
                 if why == ";":
                     self.literal(";")
@@ -97,24 +98,27 @@ class CSSParser:
         return pairs
 
     def selector(self):
-        out = TagSelector(self.word().casefold())
-        if out.tag == MEDIA_TAG:
-            return [out]
-        self.whitespace()
-        selectors = []
-        while self.i < len(self.style) and self.style[self.i] != "{":
-            if self.style[self.i] == ",":
-                selectors.append(out)
-                self.literal(",")
-                self.whitespace()
-                out = TagSelector(self.word().casefold())
-                self.whitespace()
-            else:
-                tag = self.word()
-                descendant = TagSelector(tag.casefold())
-                out = DescendantSelector(out, descendant)
-                self.whitespace()
-        return selectors + [out] 
+        try:
+            out = TagSelector(self.word().casefold())
+            if out.tag == MEDIA_TAG:
+                return [out]
+            self.whitespace()
+            selectors = []
+            while self.i < len(self.style) and self.style[self.i] != "{":
+                if self.style[self.i] == ",":
+                    selectors.append(out)
+                    self.literal(",")
+                    self.whitespace()
+                    out = TagSelector(self.word().casefold())
+                    self.whitespace()
+                else:
+                    tag = self.word()
+                    descendant = TagSelector(tag.casefold())
+                    out = DescendantSelector(out, descendant)
+                    self.whitespace()
+            return selectors + [out] 
+        except (WordParsingException, LiteralParsingException) as e:
+            raise SelectorParsingException(e)
     
     def pair(self):
         self.whitespace()
@@ -123,6 +127,7 @@ class CSSParser:
         self.literal(":")
         self.whitespace()
         val = self.word()
+        self.whitespace()
         return prop.casefold(), val
     
     def whitespace(self):
@@ -138,12 +143,12 @@ class CSSParser:
             else:
                 break
         if not (self.i > start):
-            raise Exception("Parsing error")
+            raise WordParsingException("Error parsing word")
         return self.style[start: self.i]
 
     def literal(self, literal):
         if not (self.i < len(self.style) and self.style[self.i] == literal):
-            raise Exception("Parsing error")
+            raise LiteralParsingException("Error parsing literal")
         self.i += 1
 
     def ignore_until(self, chars):
@@ -154,6 +159,24 @@ class CSSParser:
             else:
                 self.i += 1
         return None
+    
+    def ignore_block(self):
+        """Moves the pointer past the next {} block"""
+        if self.i >= len(self.style) - 1:
+            return
+        if self.style[self.i] != "{":
+            self.ignore_until("{")
+        open_tags = 1
+        while open_tags > 0 and self.i < len(self.style):
+            self.i += 1
+            stop = self.ignore_until("{}")
+            if stop == "{":
+                open_tags += 1
+            elif stop == "}":
+                open_tags -= 1
+            else:
+                break
+        self.literal("}")
 
 if __name__ == "__main__":
     print(*CSSParser(open('test.css').read()).parse(), sep='\n')

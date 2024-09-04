@@ -161,13 +161,6 @@ class BlockLayout:
         else:
             self.cursor_x = 0 
             self.cursor_y = 0
-            #self.style = {
-            #    "weight": "normal",
-            #    "style" : "roman",
-            #    "size": 12,
-            #    "vertical-align": VerticalAlign.BASELINE
-            #}
-
             self.line = []
             for node in self.nodes:
                 self.recurse(node)
