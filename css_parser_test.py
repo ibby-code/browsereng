@@ -50,6 +50,13 @@ PARSE_TEST_CASES = [
         ],
     ),
     (
+        "multi-level descendant selector",
+        "li p a { color: red; }",
+        [
+            (DescendantSelector(DescendantSelector(TagSelector("li"), TagSelector("p")), TagSelector("a")), {"color": "red"}),
+        ],
+    ),
+    (
         "multi-element style",
         "li, p { color: red; }",
         [
@@ -63,6 +70,14 @@ PARSE_TEST_CASES = [
         [
             (TagSelector("li"), {"color": "red"}),
             (DescendantSelector(TagSelector("li"), TagSelector("p")), {"color": "red"}),
+        ],
+    ),
+    (
+        "skips broken/unsupported selector",
+        "h1 { display: block} p > span {color: white;}  li {padding-left:2px;}",
+        [
+            (TagSelector("h1"), {"display": "block"}),
+            (TagSelector("li"), {"padding-left": "2px"}),
         ],
     ),
     (

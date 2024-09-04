@@ -61,11 +61,20 @@ class CSSParser:
                     rules.append((selector, body))
             except SelectorParsingException as e:
                 # debugging purposes
-                print(f"selector exception at {self.i}\nchar:{self.style[self.i]}")
-                self.ignore_block()
+                error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
+                print(f"selector exception at {self.i}\nchar:{error_c}")
+                why = self.ignore_until([";", "{"])
+                if why == ";":
+                    # if we see a pair, try to move past it
+                    self.literal(";")
+                    self.whitespace()
+                else:
+                    # if we see open brackets, skip the block since we have no selector
+                    self.ignore_block()
             except (WordParsingException, LiteralParsingException) as e:
                 # debugging purposes
-                print(f"parse error at {self.i}\nchar:{self.style[self.i]}\nerror {e}")
+                error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
+                print(f"parse error at {self.i}\nchar:{error_c}\nerror {e}")
                 why = self.ignore_until([";", "}"])
                 if why == ";":
                     self.literal(";")
@@ -74,28 +83,6 @@ class CSSParser:
                     break
                 
         return rules
-
-    def body(self):
-        pairs = {}
-        while self.i < len(self.style) and self.style[self.i] != "}":
-            try:
-                prop, val = self.pair()
-                pairs[prop] = val
-                # don't treat a missing ending ';' as an error
-                if self.i == len(self.style) or self.style[self.i] == "}":
-                    break
-                self.literal(';')
-                self.whitespace()
-            except Exception as e:
-                # debugging purposes
-                print(f"body error at {self.i}\nchar:{self.style[self.i]}\npairs: {pairs}\nerror {e}")
-                why = self.ignore_until([";", "}"])
-                if why == ";":
-                    self.literal(";")
-                    self.whitespace()
-                else:
-                    break
-        return pairs
 
     def selector(self):
         try:
@@ -119,6 +106,28 @@ class CSSParser:
             return selectors + [out] 
         except (WordParsingException, LiteralParsingException) as e:
             raise SelectorParsingException(e)
+
+    def body(self):
+        pairs = {}
+        while self.i < len(self.style) and self.style[self.i] != "}":
+            try:
+                prop, val = self.pair()
+                pairs[prop] = val
+                # don't treat a missing ending ';' as an error
+                if self.i == len(self.style) or self.style[self.i] == "}":
+                    break
+                self.literal(';')
+                self.whitespace()
+            except Exception as e:
+                # debugging purposes
+                print(f"body error at {self.i}\nchar:{self.style[self.i]}\npairs: {pairs}\nerror {e}")
+                why = self.ignore_until([";", "}"])
+                if why == ";":
+                    self.literal(";")
+                    self.whitespace()
+                else:
+                    break
+        return pairs
     
     def pair(self):
         self.whitespace()
