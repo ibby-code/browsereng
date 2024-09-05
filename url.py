@@ -48,21 +48,15 @@ class URL:
         if self.scheme == "file":
             if "/" in url and "/" in self.path:
                 url = get_relative_url(self.path.rsplit("/", 1)[0] + "/", url)
-        #    if "/" in self.path:
-        #        dir, _ = self.path.rsplit("/", 1)
-        #        url = dir + "/" + url
         elif not url.startswith("/"):
             url = get_relative_url(self.path, url)
-#            dir, _ = self.path.rsplit("/", 1)
-#            while url.startswith("../"):
-#                _, url = url.split("/", 1)
-#                if "/" in dir:
-#                    dir, _ = dir.rsplit("/", 1)
-#            url = dir + "/" + url
         if url.startswith("//"):
             return URL(self.scheme + ":" + url)
         else:
-            return URL(self.scheme + "://" + self.host + (":" + str(self.port) if self.port else "") + url)
+            base = self.scheme + "://" + self.host + (":" + str(self.port) if self.port else "")
+            if not base.endswith('/') and not url.startswith('/'):
+                base += '/'
+            return URL(base + url)
 
     def request(self):
         """Returns tuple with response and cache time"""

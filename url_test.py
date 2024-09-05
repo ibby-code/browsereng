@@ -18,6 +18,15 @@ RESOLVE_TEST_CASES = [
     {
         "name": "relative url",
         "originalUrl": "https://www.google.com/",
+        "resolveUrl": "image.svg",
+        "host": "www.google.com",
+        "port": 443,
+        "scheme": "https",
+        "path": "/image.svg",
+    },
+    {
+        "name": "relative url with slash",
+        "originalUrl": "https://www.google.com/",
         "resolveUrl": "/image.svg",
         "host": "www.google.com",
         "port": 443,
