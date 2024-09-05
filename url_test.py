@@ -42,6 +42,24 @@ RESOLVE_TEST_CASES = [
         "scheme": "https",
         "path": "/example",
     },
+    {
+        "name": "file url",
+        "originalUrl": "file://test.html",
+        "resolveUrl": "test.css",
+        "host": "",
+        "port": 0,
+        "scheme": "file",
+        "path": "test.css",
+    },
+    {
+        "name": "relative file url",
+        "originalUrl": "file://boo/foo/test.html",
+        "resolveUrl": "../../test.css",
+        "host": "",
+        "port": 0,
+        "scheme": "file",
+        "path": "test.css",
+    },
 ]
 
 

@@ -26,9 +26,9 @@ class URL:
             elif self.scheme == "https":
                 self.port = 443
         else:
-            self.host = url
+            self.host = '' 
             self.port = 0
-            self.path = "/"
+            self.path = url 
     
     def get_id(self):
         return f"{self.scheme}{self.host}{self.port}{self.path}"
@@ -42,19 +42,27 @@ class URL:
     def __hash__(self):
         return hash((self.get_id()))
     
+    # trying to make this work for files
     def resolve(self, url: str):
         if "://" in url: return URL(url)
-        if not url.startswith("/"):
-            dir, _ = self.path.rsplit("/", 1)
-            while url.startswith("../"):
-                _, url = url.split("/", 1)
-                if "/" in dir:
-                    dir, _ = dir.rsplit("/", 1)
-            url = dir + "/" + url
+        if self.scheme == "file":
+            if "/" in url and "/" in self.path:
+                url = get_relative_url(self.path.rsplit("/", 1)[0] + "/", url)
+        #    if "/" in self.path:
+        #        dir, _ = self.path.rsplit("/", 1)
+        #        url = dir + "/" + url
+        elif not url.startswith("/"):
+            url = get_relative_url(self.path, url)
+#            dir, _ = self.path.rsplit("/", 1)
+#            while url.startswith("../"):
+#                _, url = url.split("/", 1)
+#                if "/" in dir:
+#                    dir, _ = dir.rsplit("/", 1)
+#            url = dir + "/" + url
         if url.startswith("//"):
             return URL(self.scheme + ":" + url)
         else:
-            return URL(self.scheme + "://" + self.host + ":" + str(self.port) + url)
+            return URL(self.scheme + "://" + self.host + (":" + str(self.port) if self.port else "") + url)
 
     def request(self):
         """Returns tuple with response and cache time"""
@@ -141,13 +149,25 @@ class URL:
         return content, cache_time
 
     def make_file_request(self):
-        file = open(self.host, "r")
+        file = open(self.path, "r")
         return file.read(), 0
 
     def make_data_request(self):
         # ex: full url "data:text/html,Hello World!"
-        form, message = self.host.split(",", 1)
+        form, message = self.path.split(",", 1)
         return message, 0
 
     def can_use_same_socket(self, urlB):
-        return self.host == urlB.host and self.port == urlB.port
+        return self.scheme == urlB.scheme and self.host == urlB.host and self.port == urlB.port
+
+def get_relative_url(original, new):
+    if new.startswith('/'):
+        return new
+    dir, _ = original.rsplit("/", 1)
+    while new.startswith("../"):
+        _, new = new.split("/", 1)
+        if "/" in dir:
+            dir, _ = dir.rsplit("/", 1)
+        else:
+            dir = ""
+    return dir + ("/" if dir else "") + new
