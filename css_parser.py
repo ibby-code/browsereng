@@ -29,6 +29,18 @@ class DescendantSelector:
             node = node.parent
         return False
 
+@dataclass
+class DirectDescendantSelector:
+    ancestor: TagSelector
+    descendant: TagSelector
+    priority: int =  field(init=False)
+
+    def __post_init__(self):
+        self.priority = self.ancestor.priority + self.descendant.priority
+
+    def matches(self, node: html_parser.Node):
+        return self.descendant.matches(node) and node.parent and self.ancestor.matches(node.parent)
+
 class SelectorParsingException(Exception):
     pass
 
@@ -97,6 +109,13 @@ class CSSParser:
                     self.literal(",")
                     self.whitespace()
                     out = TagSelector(self.word().casefold())
+                    self.whitespace()
+                elif self.style[self.i] == '>':
+                    self.literal(">")
+                    self.whitespace()
+                    tag = self.word()
+                    descendant = TagSelector(tag.casefold())
+                    out = DirectDescendantSelector(out, descendant)
                     self.whitespace()
                 else:
                     tag = self.word()

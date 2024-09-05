@@ -1,6 +1,11 @@
 import unittest
 
-from css_parser import CSSParser, DescendantSelector, TagSelector
+from css_parser import (
+    CSSParser,
+    DescendantSelector,
+    TagSelector,
+    DirectDescendantSelector,
+)
 
 BODY_TEST_CASES = [
     ("default", "display: block;", {"display": "block"}),
@@ -53,7 +58,13 @@ PARSE_TEST_CASES = [
         "multi-level descendant selector",
         "li p a { color: red; }",
         [
-            (DescendantSelector(DescendantSelector(TagSelector("li"), TagSelector("p")), TagSelector("a")), {"color": "red"}),
+            (
+                DescendantSelector(
+                    DescendantSelector(TagSelector("li"), TagSelector("p")),
+                    TagSelector("a"),
+                ),
+                {"color": "red"},
+            ),
         ],
     ),
     (
@@ -73,8 +84,31 @@ PARSE_TEST_CASES = [
         ],
     ),
     (
+        "direct descendant",
+        "li > p { color: red; }",
+        [
+            (
+                DirectDescendantSelector(TagSelector("li"), TagSelector("p")),
+                {"color": "red"},
+            ),
+        ],
+    ),
+    (
+        "direct and indirect descendant",
+        "li > p span { color: red; }",
+        [
+            (
+                DescendantSelector(
+                    DirectDescendantSelector(TagSelector("li"), TagSelector("p")),
+                    TagSelector("span"),
+                ),
+                {"color": "red"},
+            ),
+        ],
+    ),
+    (
         "skips broken/unsupported selector",
-        "h1 { display: block} p > span {color: white;}  li {padding-left:2px;}",
+        "h1 { display: block} p:before span {color: white;}  li {padding-left:2px;}",
         [
             (TagSelector("h1"), {"display": "block"}),
             (TagSelector("li"), {"padding-left": "2px"}),
