@@ -182,13 +182,14 @@ class BlockLayout:
             for child in tree.children:
                 self.recurse(child)
    
-    def get_font(self, size, weight, font_style):
-        key = (size, weight, font_style)
+    def get_font(self, font_family, size, weight, font_style):
+        key = (font_family, size, weight, font_style)
         if key not in self.font_cache:
             font = tkinter.font.Font(
-                size=key[0],
-                weight=key[1],
-                slant=key[2],
+                family=key[0],
+                size=key[1],
+                weight=key[2],
+                slant=key[3],
             )
             label = tkinter.Label(font=font)
             self.font_cache[key] = (font, label)
@@ -197,13 +198,15 @@ class BlockLayout:
     def word(self, node, word):
         color = node.style["color"]
         weight = node.style["font-weight"]
+        # only support family for now (not serif)
+        font_family = node.style["font-family"].split(',')[0].strip('"' + "'")
         font_style = node.style["font-style"]
         # should prob use stylesheet for this
         vertical_align = node.style.get("vertical-align", VerticalAlign.BASELINE)
         if font_style == "normal": font_style = "roman"
         # assumes pixels
         size = int(float(node.style["font-size"][:-2]) * .75)
-        font =  self.get_font(size, weight, font_style)
+        font =  self.get_font(font_family, size, weight, font_style)
         text_width = font.measure(word)
         # if there is no horizontal space, write current line
         if self.cursor_x + text_width > self.width:

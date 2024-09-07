@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 type Selector = TagSelector | DescendantSelector
 
 MEDIA_TAG = "@media"
+UNIVERSAL_SELECTOR = "*"
+PROPERY_VALUE_ALLOWED_CHARS = "@#-.%'" + '"'
 
 @dataclass
 class TagSelector:
@@ -11,7 +13,7 @@ class TagSelector:
     priority:int = 1
 
     def matches(self, node: html_parser.Node):
-        return isinstance(node, html_parser.Element) and self.tag == node.tag
+        return isinstance(node, html_parser.Element) and (self.tag == UNIVERSAL_SELECTOR or self.tag == node.tag)
 
 @dataclass
 class DescendantSelector:
@@ -73,8 +75,8 @@ class CSSParser:
                     rules.append((selector, body))
             except SelectorParsingException as e:
                 # debugging purposes
-                error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
-                print(f"selector exception at {self.i}\nchar:{error_c}")
+                # error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
+                # print(f"selector exception at {self.i}\nchar:{error_c}")
                 why = self.ignore_until([";", "{"])
                 if why == ";":
                     # if we see a pair, try to move past it
@@ -85,8 +87,8 @@ class CSSParser:
                     self.ignore_block()
             except (WordParsingException, LiteralParsingException) as e:
                 # debugging purposes
-                error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
-                print(f"parse error at {self.i}\nchar:{error_c}\nerror {e}")
+                # error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
+                # print(f"parse error at {self.i}\nchar:{error_c}\nerror {e}")
                 why = self.ignore_until([";", "}"])
                 if why == ";":
                     self.literal(";")
@@ -139,7 +141,7 @@ class CSSParser:
                 self.whitespace()
             except Exception as e:
                 # debugging purposes
-                print(f"body error at {self.i}\nchar:{self.style[self.i]}\npairs: {pairs}\nerror {e}")
+                # print(f"body error at {self.i}\nchar:{self.style[self.i]}\npairs: {pairs}\nerror {e}")
                 why = self.ignore_until([";", "}"])
                 if why == ";":
                     self.literal(";")
@@ -154,19 +156,20 @@ class CSSParser:
         self.whitespace()
         self.literal(":")
         self.whitespace()
-        val = self.word()
+        val = self.word(", ")
         self.whitespace()
-        return prop.casefold(), val
+        return prop.casefold(), val.strip()
     
     def whitespace(self):
         while self.i < len(self.style) and self.style[self.i].isspace():
             self.i += 1
     
-    def word(self):
+    def word(self, extra_allowed_chars = ""):
         start = self.i
+        allowed_chars = PROPERY_VALUE_ALLOWED_CHARS + extra_allowed_chars 
         while self.i < len(self.style):
             char = self.style[self.i]
-            if char.isalnum() or char in "@#-.%":
+            if char.isalnum() or char in allowed_chars:
                 self.i += 1
             else:
                 break

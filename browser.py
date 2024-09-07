@@ -17,6 +17,7 @@ HOME_IMAGE = "img/home.png"
 
 VIEW_SOURCE = "view-source:"
 INHERITED_PROPERTIES = {
+    "font-family": "Times",
     "font-size": "16px",
     "font-style": "normal",
     "font-weight": "normal",
