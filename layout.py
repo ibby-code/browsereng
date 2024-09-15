@@ -95,7 +95,6 @@ class BlockLayout:
         self.parent = parent
         self.previous = previous
         self.children = []
-        self.display_list = []
         self.font_cache = font_cache
         self.x = None
         self.y = None
@@ -110,8 +109,8 @@ class BlockLayout:
             rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmds.append(rect)
         if self.layout_mode() == DisplayValue.INLINE:
-            for x, y, word, font, color in self.display_list:
-                cmds.append(DrawText(x, y, word, font, color))
+            for node in self.children:
+                cmds.extend(node.paint())
         return cmds
 
     def layout_mode(self):
@@ -160,17 +159,12 @@ class BlockLayout:
                 self.children.append(nxt)
         else:
             self.cursor_x = 0 
-            self.cursor_y = 0
-            self.line = []
+            self.new_line()
             for node in self.nodes:
                 self.recurse(node)
-            self.flush_line()
         for child in self.children:
             child.layout()
-        if mode == DisplayValue.BLOCK:
-            self.height = sum([child.height for child in self.children])
-        else:
-            self.height = self.cursor_y
+        self.height = sum([child.height for child in self.children])
     
     def recurse(self, tree):
         if isinstance(tree, Text):
@@ -178,10 +172,10 @@ class BlockLayout:
                 self.word(tree, word)
         else:
             if tree.tag == "br":
-                self.flush_line()
+                self.new_line()
             for child in tree.children:
                 self.recurse(child)
-   
+
     def get_font(self, font_family, size, weight, font_style):
         key = (font_family, size, weight, font_style)
         if key not in self.font_cache:
@@ -194,45 +188,114 @@ class BlockLayout:
             label = tkinter.Label(font=font)
             self.font_cache[key] = (font, label)
         return self.font_cache[key][0]
-
+   
     def word(self, node, word):
-        color = node.style["color"]
         weight = node.style["font-weight"]
         # only support family for now (not serif)
         font_family = node.style["font-family"].split(',')[0].strip('"' + "'")
         font_style = node.style["font-style"]
-        # should prob use stylesheet for this
-        vertical_align = node.style.get("vertical-align", VerticalAlign.BASELINE)
         if font_style == "normal": font_style = "roman"
-        # assumes pixels
         size = int(float(node.style["font-size"][:-2]) * .75)
         font =  self.get_font(font_family, size, weight, font_style)
         text_width = font.measure(word)
-        # if there is no horizontal space, write current line
+ 
+       # if there is no horizontal space, write current line
         if self.cursor_x + text_width > self.width:
-            self.flush_line()
-        self.line.append((self.cursor_x, word, font, color, vertical_align))
-        # shouldn't be adding a space if its followed by a tag
-        self.cursor_x += text_width + font.measure(" ") 
+            self.new_line()
 
-    def flush_line(self):
-        """Calculates baseline, adds all text objects in one line to display_list"""
-        if not self.line: return
-        font_metrics = [font.metrics() for x, word, font, color, align in self.line]
+        line = self.children[-1]
+        previous_word = line.children[-1] if line.children else None
+        text = TextLayout(node, word, line, previous_word, self.font_cache)
+        line.children.append(text)
+        self.cursor_x += text_width 
+        if previous_word:
+            self.cursor_x += font.measure(" ")
+  
+    def new_line(self):
+        self.cursor_x = 0 
+        last_line = self.children[-1] if self.children else None
+        new_line = LineLayout(self.node, self, last_line)
+        self.children.append(new_line)
+
+class LineLayout:
+    def __init__(self, node, parent, previous):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+    
+    def paint(self):
+        return []
+
+    def layout(self):
+        self.width = self.parent.width
+        self.x = self.parent.x
+
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+        for word in self.children:
+            word.layout()
+
+        font_metrics = [word.font.metrics() for word in self.children]
         max_ascent = max([metric["ascent"] for metric in font_metrics])
         max_descent = max([metric["descent"] for metric in font_metrics])
-        baseline = self.cursor_y + LEADING_FACTOR * max_ascent
-        for rel_x, word, font, color, vAlign in self.line:
-            x = self.x + rel_x
-            match vAlign:
+        baseline = self.y + LEADING_FACTOR * max_ascent
+        for word in self.children:
+            vertical_align = word.node.style.get("vertical-align", VerticalAlign.BASELINE)
+            match vertical_align:
                 case VerticalAlign.BASELINE:
-                    y = self.y + baseline - font.metrics("ascent")
+                    word.y = baseline - word.font.metrics("ascent")
                 case VerticalAlign.SUPER:
-                    y = self.y + baseline - max_ascent 
+                    word.y = baseline - max_ascent 
                 case VerticalAlign.SUB:
-                    y = self.y + (baseline + max_descent) - font.metrics("linespace")
-            self.display_list.append((x, y, word, font, color))
-        self.cursor_y = baseline + 1.25 * max_descent
-        self.cursor_x = 0 
-        self.line = []
+                    word.y = (baseline + max_descent) - word.font.metrics("linespace")
+        self.height = 1.25 * (max_ascent + max_descent)
+
+class TextLayout:
+    def __init__(self, node, word, parent, previous, font_cache):
+        self.node = node
+        self.word = word
+        self.children = []
+        self.parent = parent
+        self.previous = previous
+        self.font_cache = font_cache
+    
+    def paint(self):
+        color = self.node.style["color"]
+        return [DrawText(self.x, self.y, self.word, self.font, color)]
+    
+    def layout(self):
+        weight = self.node.style["font-weight"]
+        # only support family for now (not serif)
+        font_family = self.node.style["font-family"].split(',')[0].strip('"' + "'")
+        font_style = self.node.style["font-style"]
+        # should prob use stylesheet for this
+        if font_style == "normal": font_style = "roman"
+        # assumes pixels
+        size = int(float(self.node.style["font-size"][:-2]) * .75)
+        self.font =  self.get_font(font_family, size, weight, font_style)
+        self.width = self.font.measure(self.word)
+ 
+        # calculate word position
+        if self.previous:
+            space = self.previous.font.measure(" ")
+            self.x = self.previous.x + space + self.previous.width
+        else:
+            self.x = self.parent.x
+        self.height = self.font.metrics("linespace")
+
+    def get_font(self, font_family, size, weight, font_style):
+        key = (font_family, size, weight, font_style)
+        if key not in self.font_cache:
+            font = tkinter.font.Font(
+                family=key[0],
+                size=key[1],
+                weight=key[2],
+                slant=key[3],
+            )
+            label = tkinter.Label(font=font)
+            self.font_cache[key] = (font, label)
+        return self.font_cache[key][0]
 
