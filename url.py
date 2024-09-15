@@ -31,7 +31,10 @@ class URL:
             self.path = url 
     
     def get_id(self):
-        return f"{self.scheme}{self.host}{self.port}{self.path}"
+        return f"{self.scheme}://{self.host}:{self.port}{self.path}"
+    
+    def __str__(self) -> str:
+        return self.get_id()
 
     # eq and hash to allow use as key in dict
     def __eq__(self, other):

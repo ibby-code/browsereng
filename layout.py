@@ -80,7 +80,7 @@ class DocumentLayout:
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
-        self.y = URL_BAR_HEIGHT + 2 * VSTEP
+        self.y = URL_BAR_OFFSET 
         child.layout()
         self.height = child.height
 
@@ -221,6 +221,7 @@ class LineLayout:
         self.node = node
         self.parent = parent
         self.previous = previous
+        self.height = 0
         self.children = []
     
     def paint(self):
@@ -234,6 +235,7 @@ class LineLayout:
             self.y = self.previous.y + self.previous.height
         else:
             self.y = self.parent.y
+        if not self.children: return
         for word in self.children:
             word.layout()
 

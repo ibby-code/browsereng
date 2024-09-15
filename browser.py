@@ -31,29 +31,36 @@ class Browser:
         self.font_cache = {}
         self.window = tkinter.Tk()
         self.window.title("CanYouBrowseIt")
+        self.window.bind("<Button-1>", self.click)
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
         self.scroll_offset = 0
+        self.url = None
         self.url_value = tkinter.StringVar()
         self.display_list = []
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR)
         self.canvas.pack()
         self.draw_url_bar()
 
-    def load(self, input):
+    def load(self, input: str|url.URL):
+        print("loading:", input)
+        self.scroll_offset = 0
         is_view_source = False
-        link = input
-        if input.startswith(VIEW_SOURCE):
-            is_view_source = True
-            link = input[len(VIEW_SOURCE) :]
+        if isinstance(input, str):
+            link = input
+            if input.startswith(VIEW_SOURCE):
+                is_view_source = True
+                link = input[len(VIEW_SOURCE) :]
 
-        request = url.URL(link)
-        cache_response = self.request_from_cache(request)
+            self.url = url.URL(link)
+        else:
+            self.url = input
+        cache_response = self.request_from_cache(self.url)
         if cache_response:
             body, cache_time = cache_response
         else:
-            body, cache_time = request.request()
-            self.cache_request(request, body, cache_time)
+            body, cache_time = self.url.request()
+            self.cache_request(self.url, body, cache_time)
         tree = (
             layout.Text(None, body)
             if is_view_source
@@ -69,7 +76,7 @@ class Browser:
         ]
         rules = DEFAULT_STYLE_SHEET.copy()
         for link in links:
-            style_url = request.resolve(link)
+            style_url = self.url.resolve(link)
             try:
                 cached_response = self.request_from_cache(style_url)
                 if cached_response:
@@ -80,7 +87,7 @@ class Browser:
             except:
                 continue
             new_rules = CSSParser(css).parse()
-            print(new_rules)
+            # print(new_rules)
             rules.extend(new_rules)
         style(tree, sorted(rules, key=cascade_priority))
 
@@ -131,7 +138,7 @@ class Browser:
             0,
             0,
             WIDTH,
-            2 * VSTEP + URL_BAR_HEIGHT,
+            URL_BAR_OFFSET,
             width=0,
             fill="#dedede",
         )
@@ -165,14 +172,37 @@ class Browser:
         for cmd in self.display_list:
             if cmd.top > self.scroll_offset + HEIGHT:
                 continue
-            if cmd.bottom < self.scroll_offset + URL_BAR_HEIGHT + 3 * VSTEP:
+            if cmd.bottom < self.scroll_offset + URL_BAR_OFFSET + VSTEP:
                 continue
             cmd.execute(self.scroll_offset, self.canvas, tags=[content_tag])
 
     def scroll(self, offset, e):
-        max_y = max(self.document.height + 3 * VSTEP + URL_BAR_HEIGHT - HEIGHT, 0)
+        max_y = max(self.document.height + VSTEP + URL_BAR_OFFSET - HEIGHT, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
         self.draw()
+    
+    def click(self, e):
+        x, y = e.x, e.y
+        # print("click ", x, y)
+        y += self.scroll_offset
+        # filter all objects that are at this spot
+        objs = [obj for obj in tree_to_list(self.document, [])
+                if obj.x <= x < obj.x + obj.width
+                and obj.y <= y < obj.y + obj.height]
+        # print(objs)
+        if not objs: return
+        elt = objs[-1].node
+        # find the clickable element
+        while elt:
+            if isinstance(elt, html_parser.Element) and elt.tag == "a" and "href" in elt.attributes:
+                href = elt.attributes["href"]
+                print('href', href)
+                # ignore fragment links
+                if href.startswith("#"):
+                    return
+                url = self.url.resolve(href)
+                return self.load(url)
+            elt = elt.parent
 
 
 def paint_tree(layout_object, display_list):
