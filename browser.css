@@ -1,6 +1,9 @@
 pre { background-color: gray; }
 code { font-family: 'Courier'; }
-a { color: blue; }
+a {
+    color: blue;
+    cursor: pointer;
+}
 i { font-style: italic; }
 b { font-weight: bold; }
 small { font-size: 90%; }

@@ -23,11 +23,13 @@ class DrawText:
     font: 'tkinter.font.Font'
     color: str
     bottom: int =  field(init=False)
+    tags: list[str] = field(kw_only=True, default_factory=list)
 
     def __post_init__(self):
         self.bottom = self.top + self.font.metrics("linespace")
 
     def execute(self, scroll, canvas, tags = []):
+        tags.extend(self.tags)
         canvas.create_text(
             self.left, self.top - scroll,
             text=self.text,
@@ -44,8 +46,10 @@ class DrawRect:
     right: int
     bottom: int
     color: str
+    tags: list[str] = field(kw_only=True, default_factory=list)
 
     def execute(self, scroll, canvas, tags = []):
+        tags.extend(self.tags)
         canvas.create_rectangle(
             self.left, self.top - scroll,
             self.right, self.bottom - scroll,
@@ -265,7 +269,12 @@ class TextLayout:
     
     def paint(self):
         color = self.node.style["color"]
-        return [DrawText(self.x, self.y, self.word, self.font, color)]
+        tags = []
+        cursor_style = self.node.style.get("cursor", None)
+        if cursor_style and cursor_style == "pointer":
+            tags.append(POINTER_HOVER_TAG)
+
+        return [DrawText(self.x, self.y, self.word, self.font, color, tags=tags)]
     
     def layout(self):
         weight = self.node.style["font-weight"]

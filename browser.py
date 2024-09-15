@@ -22,6 +22,7 @@ INHERITED_PROPERTIES = {
     "font-style": "normal",
     "font-weight": "normal",
     "color": "black",
+    "cursor": "auto",
 }
 
 
@@ -39,6 +40,8 @@ class Browser:
         self.url_value = tkinter.StringVar()
         self.display_list = []
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR)
+        self.canvas.tag_bind(POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1"))
+        self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
         self.canvas.pack()
         self.draw_url_bar()
 
@@ -95,6 +98,7 @@ class Browser:
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
+        # print(self.display_list)
         self.draw()
     
     def request_from_cache(self, url: url.URL) -> tuple[str, int]|None:
@@ -203,6 +207,10 @@ class Browser:
                 url = self.url.resolve(href)
                 return self.load(url)
             elt = elt.parent
+        
+    def set_cursor(self, cursor, e):
+        # print("set cursor", cursor)
+        self.canvas.config(cursor=cursor)
 
 
 def paint_tree(layout_object, display_list):
