@@ -1,7 +1,7 @@
 import tkinter
 from dataclasses import dataclass, field
 from enum import Enum
-from html_parser import Element, Text
+from html_parser import Element, Text, create_anon_block
 from display_constants import *
 
 BLOCK_ELEMENTS = [
@@ -76,7 +76,7 @@ class DocumentLayout:
         self.height = None
 
     def layout(self):
-        child = BlockLayout([self.node], self, None, self.font_cache)
+        child = BlockLayout(self.node, self, None, self.font_cache)
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
@@ -88,10 +88,8 @@ class DocumentLayout:
         return []
 
 class BlockLayout:
-    def __init__(self, nodes, parent, previous, font_cache):
-        # anon block boxes
-        self.nodes = nodes
-        self.node = nodes[0]
+    def __init__(self, node, parent, previous, font_cache):
+        self.node = node
         self.parent = parent
         self.previous = previous
         self.children = []
@@ -114,7 +112,7 @@ class BlockLayout:
         return cmds
 
     def layout_mode(self):
-        if isinstance(self.node, Text) or len(self.nodes) > 1:
+        if isinstance(self.node, Text):
             return DisplayValue.INLINE
         # default to block display if here are both
         elif any([isinstance(child, Element) and \
@@ -147,21 +145,22 @@ class BlockLayout:
                     block_nodes_buffer.append(child)
                     continue
                 elif block_nodes_buffer:
-                    previous = BlockLayout(block_nodes_buffer, self, previous, self.font_cache)
+                    anon_box = create_anon_block(self.node, self.node.style, block_nodes_buffer)
+                    previous = BlockLayout(anon_box, self, previous, self.font_cache)
                     self.children.append(previous)
                     block_nodes_buffer = []
                     
-                nxt = BlockLayout([child], self, previous, self.font_cache)
+                nxt = BlockLayout(child, self, previous, self.font_cache)
                 self.children.append(nxt)
                 previous = nxt
             if block_nodes_buffer:
-                nxt = BlockLayout(block_nodes_buffer, self, previous, self.font_cache)
+                anon_box = create_anon_block(self.node, self.node.style, block_nodes_buffer)
+                nxt = BlockLayout(anon_box, self, previous, self.font_cache)
                 self.children.append(nxt)
         else:
             self.cursor_x = 0 
             self.new_line()
-            for node in self.nodes:
-                self.recurse(node)
+            self.recurse(self.node)
         for child in self.children:
             child.layout()
         self.height = sum([child.height for child in self.children])
