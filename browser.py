@@ -35,6 +35,7 @@ class Browser:
         self.window.bind("<Button-1>", self.click)
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
+        self.window.bind("<MouseWheel>", self.scroll_mouse)
         self.scroll_offset = 0
         self.url = None
         self.url_value = tkinter.StringVar()
@@ -179,6 +180,16 @@ class Browser:
             if cmd.bottom < self.scroll_offset + URL_BAR_OFFSET + VSTEP:
                 continue
             cmd.execute(self.scroll_offset, self.canvas, tags=[content_tag])
+    
+    def scroll_mouse(self, e):
+        delta = e.delta
+        if delta % 120 == 0:
+            # windows uses multiples of 120
+            offset = SCROLL_STEP * (delta // 120)
+        else:
+            # mac uses multiples of 1
+            offset = SCROLL_STEP * delta
+        self.scroll(offset, e)
 
     def scroll(self, offset, e):
         max_y = max(self.document.height + VSTEP + URL_BAR_OFFSET - HEIGHT, 0)
