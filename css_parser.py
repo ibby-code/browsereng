@@ -118,7 +118,7 @@ class CSSParser:
 
     def selector(self):
         try:
-            out = get_individual_selector(self.word().casefold())
+            out = get_individual_selector(self.word("*").casefold())
             if isinstance(out, TagSelector) and out.tag == MEDIA_TAG:
                 return [out]
             self.whitespace()

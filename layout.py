@@ -2,7 +2,7 @@ import tkinter
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from html_parser import Element, Text, create_anon_block
+from html_parser import Node, Element, Text, create_anon_block
 from display_constants import *
 
 BLOCK_ELEMENTS = [
@@ -31,6 +31,9 @@ def get_font(font_family, size, weight, font_style):
         label = tkinter.Label(font=font)
         FONT_CACHE[key] = (font, label)
     return FONT_CACHE[key][0]
+
+def is_inline_display(node: Node) -> bool:
+    return isinstance(node, Text) or node.style["display"] == DisplayValue.INLINE.value 
  
 @dataclass()
 class DrawText:
@@ -135,7 +138,7 @@ class BlockLayout:
             return DisplayValue.INLINE
         # default to block display if here are both
         elif any([isinstance(child, Element) and \
-                child.tag in BLOCK_ELEMENTS
+                child.style["display"] == DisplayValue.BLOCK.value
                 for child in self.node.children]):
             return DisplayValue.BLOCK
         elif self.node.children:
@@ -143,9 +146,7 @@ class BlockLayout:
         else:
             return DisplayValue.BLOCK
     
-    def is_textlike_node(self, node):
-        return isinstance(node, Text) or node.tag in TEXTLIKE_ELEMENTS 
-    
+   
     def layout(self):
         self.x = self.parent.x
         match = re.search(PIXEL_VALUE_REGEX, self.node.style.get('width', ''))
@@ -164,7 +165,7 @@ class BlockLayout:
             for child in self.node.children:
                 # hide the <head> tag
                 if isinstance(child, Element) and child.tag == "head": continue
-                if self.is_textlike_node(child):
+                if is_inline_display(child):
                     block_nodes_buffer.append(child)
                     continue
                 elif block_nodes_buffer:
@@ -181,7 +182,6 @@ class BlockLayout:
                 nxt = BlockLayout(anon_box, self, previous)
                 self.children.append(nxt)
         else:
-            self.cursor_x = 0 
             self.new_line()
             self.recurse(self.node)
         for child in self.children:

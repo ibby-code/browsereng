@@ -51,6 +51,7 @@ class Element(Node):
         return f"<{self.tag}>"
 
 def create_anon_block(parent: Node, style: dict[str, str], children: list[Node]):
+    style["display"] = "block"
     return Element(parent, '_anon_', {}, children=children, style=style)
 
 class HTMLParser:
