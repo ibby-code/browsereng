@@ -1,4 +1,5 @@
 import tkinter
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from html_parser import Element, Text, create_anon_block
@@ -14,6 +15,8 @@ BLOCK_ELEMENTS = [
 ]
 
 TEXTLIKE_ELEMENTS = ['a', 'b', 'i', 'small', 'big', 'sub', 'sup']
+
+PIXEL_VALUE_REGEX = r'(\d+)px'
 
 FONT_CACHE = {}
 def get_font(font_family, size, weight, font_style):
@@ -145,7 +148,11 @@ class BlockLayout:
     
     def layout(self):
         self.x = self.parent.x
-        self.width = self.parent.width
+        match = re.search(PIXEL_VALUE_REGEX, self.node.style.get('width', ''))
+        if match:
+            self.width = int(match.group(1))
+        else:
+            self.width = self.parent.width
         if self.previous:
             self.y = self.previous.y + self.previous.height
         else:
@@ -179,7 +186,13 @@ class BlockLayout:
             self.recurse(self.node)
         for child in self.children:
             child.layout()
-        self.height = sum([child.height for child in self.children])
+
+        match = re.search(PIXEL_VALUE_REGEX, self.node.style.get('height', ''))
+        # override normal height with css
+        if match:
+            self.height = int(match.group(1))
+        else:
+            self.height = sum([child.height for child in self.children])
     
     def recurse(self, tree):
         if isinstance(tree, Text):

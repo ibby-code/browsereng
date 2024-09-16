@@ -176,7 +176,7 @@ class Browser:
         for cmd in self.display_list:
             if cmd.top > self.scroll_offset + HEIGHT:
                 continue
-            if cmd.bottom < self.scroll_offset + URL_BAR_OFFSET + VSTEP:
+            if cmd.bottom < self.scroll_offset + URL_BAR_OFFSET + 2 * VSTEP:
                 continue
             cmd.execute(self.scroll_offset, self.canvas, tags=[content_tag])
     
