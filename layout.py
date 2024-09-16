@@ -14,7 +14,7 @@ BLOCK_ELEMENTS = [
     "legend", "details", "summary"
 ]
 
-TEXTLIKE_ELEMENTS = ['a', 'b', 'i', 'small', 'big', 'sub', 'sup']
+TEXTLIKE_ELEMENTS = ['a', 'b', 'i', 'small', 'big', 'sub', 'sup', 'span']
 
 PIXEL_VALUE_REGEX = r'(\d+)px'
 

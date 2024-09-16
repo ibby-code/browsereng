@@ -5,6 +5,7 @@ from css_parser import (
     DescendantSelector,
     TagSelector,
     DirectDescendantSelector,
+    ClassSelector,
 )
 
 BODY_TEST_CASES = [
@@ -103,6 +104,16 @@ PARSE_TEST_CASES = [
                     TagSelector("span"),
                 ),
                 {"color": "red"},
+            ),
+        ],
+    ),
+    (
+        "class selector",
+        ".green-text { color: green; }",
+        [
+            (
+                ClassSelector("green-text"),
+                {"color": "green"},
             ),
         ],
     ),

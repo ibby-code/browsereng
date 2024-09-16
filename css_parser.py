@@ -8,17 +8,35 @@ UNIVERSAL_SELECTOR = "*"
 PROPERY_VALUE_ALLOWED_CHARS = "@#-.%'" + '"'
 
 @dataclass
+class ClassSelector:
+    class_selector: str
+    priority:int = 1
+
+    def matches(self, node: html_parser.Node):
+        if not isinstance(node, html_parser.Element): return False
+        classes = node.attributes.get('class', '').split(' ')
+        return self.class_selector in classes
+
+@dataclass
 class TagSelector:
     tag: str
-    priority:int = 1
+    priority:int = 2
 
     def matches(self, node: html_parser.Node):
         return isinstance(node, html_parser.Element) and (self.tag == UNIVERSAL_SELECTOR or self.tag == node.tag)
 
+type IndividualSelector = ClassSelector|TagSelector
+
+def get_individual_selector(selector: str) -> IndividualSelector:
+    if selector.startswith('.'):
+        return ClassSelector(selector[1:])
+    else:
+        return TagSelector(selector)
+
 @dataclass
 class DescendantSelector:
-    ancestor: TagSelector
-    descendant: TagSelector
+    ancestor: IndividualSelector 
+    descendant: IndividualSelector 
     priority: int =  field(init=False)
 
     def __post_init__(self):
@@ -33,8 +51,8 @@ class DescendantSelector:
 
 @dataclass
 class DirectDescendantSelector:
-    ancestor: TagSelector
-    descendant: TagSelector
+    ancestor: IndividualSelector 
+    descendant: IndividualSelector 
     priority: int =  field(init=False)
 
     def __post_init__(self):
@@ -100,8 +118,8 @@ class CSSParser:
 
     def selector(self):
         try:
-            out = TagSelector(self.word().casefold())
-            if out.tag == MEDIA_TAG:
+            out = get_individual_selector(self.word().casefold())
+            if isinstance(out, TagSelector) and out.tag == MEDIA_TAG:
                 return [out]
             self.whitespace()
             selectors = []
@@ -110,18 +128,18 @@ class CSSParser:
                     selectors.append(out)
                     self.literal(",")
                     self.whitespace()
-                    out = TagSelector(self.word().casefold())
+                    out = get_individual_selector(self.word().casefold())
                     self.whitespace()
                 elif self.style[self.i] == '>':
                     self.literal(">")
                     self.whitespace()
                     tag = self.word()
-                    descendant = TagSelector(tag.casefold())
+                    descendant = get_individual_selector(tag.casefold())
                     out = DirectDescendantSelector(out, descendant)
                     self.whitespace()
                 else:
                     tag = self.word()
-                    descendant = TagSelector(tag.casefold())
+                    descendant = get_individual_selector(tag.casefold())
                     out = DescendantSelector(out, descendant)
                     self.whitespace()
             return selectors + [out] 
