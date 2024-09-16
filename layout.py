@@ -15,6 +15,20 @@ BLOCK_ELEMENTS = [
 
 TEXTLIKE_ELEMENTS = ['a', 'b', 'i', 'small', 'big', 'sub', 'sup']
 
+FONT_CACHE = {}
+def get_font(font_family, size, weight, font_style):
+    key = (font_family, size, weight, font_style)
+    if key not in FONT_CACHE:
+        font = tkinter.font.Font(
+            family=key[0],
+            size=key[1],
+            weight=key[2],
+            slant=key[3],
+        )
+        label = tkinter.Label(font=font)
+        FONT_CACHE[key] = (font, label)
+    return FONT_CACHE[key][0]
+ 
 @dataclass()
 class DrawText:
     left: int
@@ -68,11 +82,10 @@ class DisplayValue(Enum):
     INLINE = 'inline'
 
 class DocumentLayout:
-    def __init__(self, node, font_cache):
+    def __init__(self, node):
         self.node = node
         self.parent = None
         self.children = []
-        self.font_cache = font_cache
         self.display_list = []
         self.x = None
         self.y = None
@@ -80,7 +93,7 @@ class DocumentLayout:
         self.height = None
 
     def layout(self):
-        child = BlockLayout(self.node, self, None, self.font_cache)
+        child = BlockLayout(self.node, self, None)
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
@@ -92,12 +105,11 @@ class DocumentLayout:
         return []
 
 class BlockLayout:
-    def __init__(self, node, parent, previous, font_cache):
+    def __init__(self, node, parent, previous):
         self.node = node
         self.parent = parent
         self.previous = previous
         self.children = []
-        self.font_cache = font_cache
         self.x = None
         self.y = None
         self.width = None
@@ -150,16 +162,16 @@ class BlockLayout:
                     continue
                 elif block_nodes_buffer:
                     anon_box = create_anon_block(self.node, self.node.style, block_nodes_buffer)
-                    previous = BlockLayout(anon_box, self, previous, self.font_cache)
+                    previous = BlockLayout(anon_box, self, previous)
                     self.children.append(previous)
                     block_nodes_buffer = []
                     
-                nxt = BlockLayout(child, self, previous, self.font_cache)
+                nxt = BlockLayout(child, self, previous)
                 self.children.append(nxt)
                 previous = nxt
             if block_nodes_buffer:
                 anon_box = create_anon_block(self.node, self.node.style, block_nodes_buffer)
-                nxt = BlockLayout(anon_box, self, previous, self.font_cache)
+                nxt = BlockLayout(anon_box, self, previous)
                 self.children.append(nxt)
         else:
             self.cursor_x = 0 
@@ -179,19 +191,7 @@ class BlockLayout:
             for child in tree.children:
                 self.recurse(child)
 
-    def get_font(self, font_family, size, weight, font_style):
-        key = (font_family, size, weight, font_style)
-        if key not in self.font_cache:
-            font = tkinter.font.Font(
-                family=key[0],
-                size=key[1],
-                weight=key[2],
-                slant=key[3],
-            )
-            label = tkinter.Label(font=font)
-            self.font_cache[key] = (font, label)
-        return self.font_cache[key][0]
-   
+  
     def word(self, node, word):
         weight = node.style["font-weight"]
         # only support family for now (not serif)
@@ -199,7 +199,7 @@ class BlockLayout:
         font_style = node.style["font-style"]
         if font_style == "normal": font_style = "roman"
         size = int(float(node.style["font-size"][:-2]) * .75)
-        font =  self.get_font(font_family, size, weight, font_style)
+        font =  get_font(font_family, size, weight, font_style)
         text_width = font.measure(word)
  
        # if there is no horizontal space, write current line
@@ -208,7 +208,7 @@ class BlockLayout:
 
         line = self.children[-1]
         previous_word = line.children[-1] if line.children else None
-        text = TextLayout(node, word, line, previous_word, self.font_cache)
+        text = TextLayout(node, word, line, previous_word)
         line.children.append(text)
         self.cursor_x += text_width 
         if previous_word:
@@ -259,13 +259,12 @@ class LineLayout:
         self.height = 1.25 * (max_ascent + max_descent)
 
 class TextLayout:
-    def __init__(self, node, word, parent, previous, font_cache):
+    def __init__(self, node, word, parent, previous):
         self.node = node
         self.word = word
         self.children = []
         self.parent = parent
         self.previous = previous
-        self.font_cache = font_cache
     
     def paint(self):
         color = self.node.style["color"]
@@ -285,7 +284,7 @@ class TextLayout:
         if font_style == "normal": font_style = "roman"
         # assumes pixels
         size = int(float(self.node.style["font-size"][:-2]) * .75)
-        self.font =  self.get_font(font_family, size, weight, font_style)
+        self.font =  get_font(font_family, size, weight, font_style)
         self.width = self.font.measure(self.word)
  
         # calculate word position
@@ -295,17 +294,3 @@ class TextLayout:
         else:
             self.x = self.parent.x
         self.height = self.font.metrics("linespace")
-
-    def get_font(self, font_family, size, weight, font_style):
-        key = (font_family, size, weight, font_style)
-        if key not in self.font_cache:
-            font = tkinter.font.Font(
-                family=key[0],
-                size=key[1],
-                weight=key[2],
-                slant=key[3],
-            )
-            label = tkinter.Label(font=font)
-            self.font_cache[key] = (font, label)
-        return self.font_cache[key][0]
-

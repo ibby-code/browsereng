@@ -29,7 +29,6 @@ INHERITED_PROPERTIES = {
 class Browser:
     def __init__(self):
         self.cache = {}
-        self.font_cache = {}
         self.window = tkinter.Tk()
         self.window.title("CanYouBrowseIt")
         self.window.bind("<Button-1>", self.click)
@@ -95,7 +94,7 @@ class Browser:
             rules.extend(new_rules)
         style(tree, sorted(rules, key=cascade_priority))
 
-        self.document = layout.DocumentLayout(tree, self.font_cache)
+        self.document = layout.DocumentLayout(tree)
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
