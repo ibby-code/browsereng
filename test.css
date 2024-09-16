@@ -1,4 +1,6 @@
 p > span { color: red; }
+pre { width: 300px; }
+pre 
 html {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 16px;

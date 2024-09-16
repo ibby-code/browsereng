@@ -224,6 +224,7 @@ class BlockLayout:
         text = TextLayout(node, word, line, previous_word)
         line.children.append(text)
         self.cursor_x += text_width 
+        # we should think about when to add a space
         if previous_word:
             self.cursor_x += font.measure(" ")
   
@@ -302,6 +303,7 @@ class TextLayout:
  
         # calculate word position
         if self.previous:
+            # we should think about when to add a space
             space = self.previous.font.measure(" ")
             self.x = self.previous.x + space + self.previous.width
         else:
