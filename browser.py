@@ -25,25 +25,196 @@ INHERITED_PROPERTIES = {
     "cursor": "auto",
 }
 
+CLEARABLE_CONTENT_TAG = "clearable"
+
+class Chrome:
+    def __init__(self, browser):
+        self.browser = browser
+        self.font = layout.get_font("Arisl", 20, "normal", "roman")
+        self.font_height = self.font.metrics("linespace")
+        self.padding = 5
+        self.tabbar_top = 0
+        self.tabbar_bottom = self.font_height + 2 * self.padding
+        # to change
+        self.bottom = self.tabbar_bottom
+        plus_width = self.font.measure("+") + 2 * self.padding
+        self.newtab_rect = layout.Rect(self.padding, self.padding, self.padding + plus_width, self.padding + self.font_height)
+    
+    def click(self, x, y):
+        if self.newtab_rect.containsPoint(x, y):
+            self.browser.new_tab(DEFAULT_FILE)
+        else:
+            for i, tab in enumerate(self.browser.tabs):
+                if self.tab_rect(i).containsPoint(x, y):
+                    self.browser.active_tab = tab
+                    break
+    
+    def tab_rect(self, i):
+        tabs_start = self.newtab_rect.right + self.padding
+        tab_width = self.font.measure("Tab X") + 2*self.padding
+        return layout.Rect(
+            tabs_start + tab_width * i, self.tabbar_top,
+            tabs_start + tab_width * (i + 1), self.tabbar_bottom)
+    
+    def paint(self):
+        cmds = []
+        # add background for chrome
+        cmds.append(layout.DrawRect(
+            layout.Rect(0, 0, WIDTH, self.bottom),
+            "white"))
+        cmds.append(layout.DrawLine(
+            layout.Rect(0, self.bottom, WIDTH,
+            self.bottom), "black", 1))
+        # add new tab button
+        cmds.append(layout.DrawOutline(self.newtab_rect, "black", 1))
+        cmds.append(layout.DrawText(
+            self.newtab_rect.left + self.padding,
+            self.newtab_rect.top,
+            "+", self.font, "black"))
+        # draw tabs
+        for i, tab in enumerate(self.browser.tabs):
+            bounds = self.tab_rect(i)
+            cmds.append(layout.DrawLine(layout.Rect(bounds.left, 0, bounds.left, bounds.bottom),
+                "black", 1))
+            cmds.append(layout.DrawLine(layout.Rect(
+                bounds.right, 0, bounds.right, bounds.bottom),
+                "black", 1))
+            cmds.append(layout.DrawText(
+                bounds.left + self.padding, bounds.top + self.padding,
+                "Tab {}".format(i), self.font, "black"))
+            if tab == self.browser.active_tab:
+                cmds.append(layout.DrawLine(layout.Rect(
+                    0, bounds.bottom, bounds.left, bounds.bottom),
+                    "black", 1))
+                cmds.append(layout.DrawLine(layout.Rect(
+                    bounds.right, bounds.bottom, WIDTH, bounds.bottom),
+                    "black", 1))
+        return cmds
 
 class Browser:
     def __init__(self):
-        self.cache = {}
+        self.tabs: list[Tab] = []
+        self.active_tab: Tab|None = None
         self.window = tkinter.Tk()
         self.window.title("CanYouBrowseIt")
         self.window.bind("<Button-1>", self.click)
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
         self.window.bind("<MouseWheel>", self.scroll_mouse)
-        self.scroll_offset = 0
-        self.url = None
-        self.url_value = tkinter.StringVar()
-        self.display_list = []
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR)
         self.canvas.tag_bind(POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1"))
         self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
-        self.canvas.pack()
+        self.chrome = Chrome(self)
+        self.url_value = tkinter.StringVar()
         self.draw_url_bar()
+        self.canvas.pack()
+
+    def scroll_mouse(self, e):
+        delta = e.delta
+        if delta % 120 == 0:
+            # windows uses multiples of 120
+            offset = SCROLL_STEP * (delta // 120)
+        else:
+            # mac uses multiples of 1
+            offset = SCROLL_STEP * delta
+        self.scroll(offset, e)
+    
+    def scroll(self, increment, e):
+        self.active_tab.scroll(increment)
+        self.draw()
+    
+    def click(self, e):
+        if e.y < self.chrome.bottom:
+            print("chrome click")
+            self.chrome.click(e.x, e.y)
+        else:
+            tab_y = e.y - self.chrome.bottom
+            self.active_tab.click(e.x, tab_y)
+        self.draw()
+
+    def set_cursor(self, cursor, e):
+        # print("set cursor", cursor)
+        self.canvas.config(cursor=cursor)
+
+    def load_url(self, e=None):
+        url_value = self.url_value.get()
+        print(url_value)
+        if url_value:
+            self.active_tab.load(url_value)
+            self.draw()
+
+    def load_home_url(self):
+        self.active_tab.load(DEFAULT_FILE)
+   
+    def new_tab(self, url):
+        new_tab = Tab(HEIGHT - self.chrome.bottom)
+        new_tab.load(url)
+        self.active_tab = new_tab
+        self.tabs.append(new_tab)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete(CLEARABLE_CONTENT_TAG)
+        self.active_tab.draw(self.canvas, self.chrome.bottom)
+        # TODO: add tabs to clearable content
+        for cmd in self.chrome.paint():
+            cmd.execute(0, self.canvas)
+
+    def draw_url_bar(self):
+        url_entry = tkinter.Entry(
+            self.window, textvariable=self.url_value, font=("Garamond", 10, "normal")
+        )
+        url_entry.bind("<Return>", self.load_url)
+        submit_button = tkinter.Button(self.window, text="Go", command=self.load_url)
+        im = Image.open(HOME_IMAGE)
+        im.thumbnail((HOME_BUTTON_WIDTH, URL_BAR_HEIGHT), Image.Resampling.LANCZOS)
+        home_img = ImageTk.PhotoImage(im)
+        home_button = tkinter.Button(
+            self.window, image=home_img, command=self.load_home_url
+        )
+        # you must save a reference to tkinter image to avoid garbage collection
+        home_button.image = home_img
+        base_y = self.chrome.bottom
+        self.canvas.create_rectangle(
+            0,
+            base_y,
+            WIDTH,
+            base_y + URL_BAR_OFFSET,
+            width=0,
+            fill="#dedede",
+        )
+        self.canvas.create_window(
+            HSTEP,
+            base_y + VSTEP,
+            window=home_button,
+            anchor="nw",
+            width=HOME_BUTTON_WIDTH,
+            height=URL_BAR_HEIGHT,
+        )
+        self.canvas.create_window(
+            HSTEP + HOME_BUTTON_WIDTH + HSTEP,
+            base_y + VSTEP,
+            window=url_entry,
+            anchor="nw",
+            height=URL_BAR_HEIGHT,
+            width=URL_BAR_WIDTH,
+        )
+        self.canvas.create_window(
+            HSTEP + HOME_BUTTON_WIDTH + HSTEP + URL_BAR_WIDTH + HSTEP,
+            base_y + VSTEP,
+            window=submit_button,
+            anchor="nw",
+            height=URL_BAR_HEIGHT,
+        )
+
+class Tab:
+    def __init__(self, tab_height):
+        # TODO: share cache across tabs?
+        self.cache = {}
+        self.tab_height = tab_height
+        self.scroll_offset = 0
+        self.url = None
+        self.display_list = []
 
     def load(self, input: str|url.URL):
         print("loading:", input)
@@ -99,7 +270,6 @@ class Browser:
         self.display_list = []
         paint_tree(self.document, self.display_list)
         # print(self.display_list)
-        self.draw()
     
     def request_from_cache(self, url: url.URL) -> tuple[str, int]|None:
         if url in self.cache:
@@ -115,88 +285,19 @@ class Browser:
             print(f"storing at {time.time()} with {cache_time}")
             self.cache[url] = (body, time.time(), cache_time)
 
-    def load_url(self, e=None):
-        url_value = self.url_value.get()
-        print(url_value)
-        if url_value:
-            self.load(url_value)
-
-    def load_home_url(self):
-        self.load(DEFAULT_FILE)
-
-    def draw_url_bar(self):
-        url_entry = tkinter.Entry(
-            self.window, textvariable=self.url_value, font=("Garamond", 10, "normal")
-        )
-        url_entry.bind("<Return>", self.load_url)
-        submit_button = tkinter.Button(self.window, text="Go", command=self.load_url)
-        im = Image.open(HOME_IMAGE)
-        im.thumbnail((HOME_BUTTON_WIDTH, URL_BAR_HEIGHT), Image.Resampling.LANCZOS)
-        home_img = ImageTk.PhotoImage(im)
-        home_button = tkinter.Button(
-            self.window, image=home_img, command=self.load_home_url
-        )
-        # you must save a reference to tkinter image to avoid garbage collection
-        home_button.image = home_img
-        self.canvas.create_rectangle(
-            0,
-            0,
-            WIDTH,
-            URL_BAR_OFFSET,
-            width=0,
-            fill="#dedede",
-        )
-        self.canvas.create_window(
-            HSTEP,
-            VSTEP,
-            window=home_button,
-            anchor="nw",
-            width=HOME_BUTTON_WIDTH,
-            height=URL_BAR_HEIGHT,
-        )
-        self.canvas.create_window(
-            HSTEP + HOME_BUTTON_WIDTH + HSTEP,
-            VSTEP,
-            window=url_entry,
-            anchor="nw",
-            height=URL_BAR_HEIGHT,
-            width=URL_BAR_WIDTH,
-        )
-        self.canvas.create_window(
-            HSTEP + HOME_BUTTON_WIDTH + HSTEP + URL_BAR_WIDTH + HSTEP,
-            VSTEP,
-            window=submit_button,
-            anchor="nw",
-            height=URL_BAR_HEIGHT,
-        )
-
-    def draw(self):
-        content_tag = "content"
-        self.canvas.delete(content_tag)
+    def draw(self, canvas, offset):
         for cmd in self.display_list:
-            if cmd.top > self.scroll_offset + HEIGHT:
+            if cmd.rect.top> self.scroll_offset + self.tab_height:
                 continue
-            if cmd.bottom < self.scroll_offset + URL_BAR_OFFSET + VSTEP:
+            if cmd.rect.bottom < self.scroll_offset + URL_BAR_OFFSET + VSTEP:
                 continue
-            cmd.execute(self.scroll_offset, self.canvas, tags=[content_tag])
+            cmd.execute(self.scroll_offset - offset, canvas, tags=[CLEARABLE_CONTENT_TAG])
     
-    def scroll_mouse(self, e):
-        delta = e.delta
-        if delta % 120 == 0:
-            # windows uses multiples of 120
-            offset = SCROLL_STEP * (delta // 120)
-        else:
-            # mac uses multiples of 1
-            offset = SCROLL_STEP * delta
-        self.scroll(offset, e)
-
-    def scroll(self, offset, e):
-        max_y = max(self.document.height + VSTEP + URL_BAR_OFFSET - HEIGHT, 0)
+    def scroll(self, offset):
+        max_y = max(self.document.height + VSTEP + URL_BAR_OFFSET - self.tab_height, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
-        self.draw()
     
-    def click(self, e):
-        x, y = e.x, e.y
+    def click(self, x, y):
         # print("click ", x, y)
         y += self.scroll_offset
         # filter all objects that are at this spot
@@ -218,10 +319,6 @@ class Browser:
                 return self.load(url)
             elt = elt.parent
         
-    def set_cursor(self, cursor, e):
-        # print("set cursor", cursor)
-        self.canvas.config(cursor=cursor)
-
 
 def paint_tree(layout_object, display_list):
     display_list.extend(layout_object.paint())
@@ -285,5 +382,5 @@ if __name__ == "__main__":
     else:
         arg = sys.argv[1]
     b = Browser()
-    b.load(arg)
+    b.new_tab(arg)
     tkinter.mainloop()
