@@ -408,7 +408,9 @@ class Browser:
 
     def draw(self):
         self.canvas.delete(CLEARABLE_CONTENT_TAG)
-        title = self.active_tab.title if self.active_tab.title else DEFAULT_BROWSER_TITLE
+        title = (
+            self.active_tab.title if self.active_tab.title else DEFAULT_BROWSER_TITLE
+        )
         self.window.title(title)
         self.active_tab.draw(self.canvas, self.chrome.bottom)
         # TODO: add tabs to clearable content
@@ -427,14 +429,14 @@ class Tab:
         self.scroll_offset = 0
         self.url = None
         self.display_list = []
-    
+
     def has_back_history(self) -> bool:
         return len(self.backward_history) > 1
 
     def has_forward_history(self) -> bool:
         return len(self.forward_history) > 0
 
-    def load(self, input: str | url.URL, clear_forward_histpry = True):
+    def load(self, input: str | url.URL, clear_forward_histpry=True):
         print("loading:", input)
         self.backward_history.append(input)
         if clear_forward_histpry:
@@ -487,11 +489,11 @@ class Tab:
             rules.extend(new_rules)
         style(tree, sorted(rules, key=cascade_priority))
         titles = [
-            node.children[0].text 
+            node.children[0].text
             for node in nodes_list
             if isinstance(node, html_parser.Element) and node.tag == "title"
         ]
-        self.title = titles[0] if len(titles) else "" 
+        self.title = titles[0] if len(titles) else ""
 
         self.document = layout.DocumentLayout(tree)
         self.document.layout()
@@ -519,7 +521,7 @@ class Tab:
             self.forward_history.append(current)
             back = self.backward_history.pop()
             self.load(back, False)
-    
+
     def go_forward(self):
         if len(self.forward_history) > 0:
             next = self.forward_history.pop()
@@ -535,6 +537,20 @@ class Tab:
                 self.scroll_offset - offset, canvas, tags=[CLEARABLE_CONTENT_TAG]
             )
 
+    def scroll_to_fragment(self, fragment: str, layout_list):
+        print(f"scrolling to {fragment}")
+        layout_y = [
+            l.y 
+            for l in layout_list
+            if isinstance(l.node, layout.Element)
+            and l.node.attributes.get("id", "") == fragment[1:]
+        ]
+        if not len(layout_y) > 0:
+            return
+        destination = layout_y[0]
+        offset = abs(self.scroll_offset - destination)
+        self.scroll(-offset if self.scroll_offset > destination else offset)
+
     def scroll(self, offset):
         max_y = max(self.document.height + VSTEP - self.tab_height, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
@@ -543,9 +559,10 @@ class Tab:
         # print("click ", x, y)
         y += self.scroll_offset
         # filter all objects that are at this spot
+        layout_list = tree_to_list(self.document, [])
         objs = [
             obj
-            for obj in tree_to_list(self.document, [])
+            for obj in layout_list
             if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
         ]
         # print(objs)
@@ -563,7 +580,7 @@ class Tab:
                 print("href", href)
                 # ignore fragment links
                 if href.startswith("#"):
-                    return
+                    return self.scroll_to_fragment(href, layout_list)
                 url = self.url.resolve(href)
                 return self.load(url)
             elt = elt.parent
