@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
 from display_constants import *
+from PIL import ImageTk
 
 BLOCK_ELEMENTS = [
     "html", "body", "article", "section", "nav", "aside",
@@ -71,6 +72,23 @@ class DrawLine:
             self.rect.right, self.rect.bottom - scroll,
             width=self.thickness,
             fill=self.color)
+
+@dataclass
+class DrawImage:
+    left: int
+    top: int
+    image: ImageTk.PhotoImage
+    tags: list[str] = field(kw_only=True, default_factory=list)
+
+    def execute(self, scroll, canvas, tags = []):
+        tags.extend(self.tags)
+        canvas.create_image(
+            self.left,
+            self.top - scroll,
+            anchor="nw",
+            image=self.image,
+            tags=tags
+        )
  
 @dataclass()
 class DrawText:

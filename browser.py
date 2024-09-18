@@ -15,6 +15,7 @@ BG_DEFAULT_COLOR = "white"
 DEFAULT_FILE = "file://test.html"
 DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 HOME_IMAGE = "img/home.png"
+HOME_IMAGE_SIZE = 24
 
 VIEW_SOURCE = "view-source:"
 INHERITED_PROPERTIES = {
@@ -62,7 +63,7 @@ class Chrome:
             self.urlbar_bottom - self.padding
         )
  
-        home_width = self.font.measure("H") + 2 * self.padding
+        home_width = HOME_IMAGE_SIZE + 2 * self.padding
         self.home_rect = layout.Rect(
             self.padding + self.back_rect.right,
             self.urlbar_top + self.padding,
@@ -181,10 +182,16 @@ class Chrome:
             "<", self.font, "black", tags=[POINTER_HOVER_TAG]))
         # draw home button
         cmds.append(layout.DrawOutline(self.home_rect, "black", 1))
-        cmds.append(layout.DrawText(
+        self.image = load_home_image()
+        height = self.home_rect.bottom - self.home_rect.top
+        extra_space = height - self.image.height() 
+        h_padding = round(extra_space / 2)
+        cmds.append(layout.DrawImage(
             self.home_rect.left + self.padding,
-            self.home_rect.top,
-            "H", self.font, "black", tags=[POINTER_HOVER_TAG]))
+            self.home_rect.top + h_padding,
+            self.image,
+            tags=[POINTER_HOVER_TAG]
+        ))
         # draw address bar
         cmds.append(layout.DrawOutline(self.address_rect, "black", 1))
         url = str(self.browser.active_tab.url)
@@ -425,7 +432,7 @@ def paint_tree(layout_object, display_list):
 
 def load_home_image():
     im = Image.open(HOME_IMAGE)
-    im.thumbnail((20, 20), Image.Resampling.LANCZOS)
+    im.thumbnail((HOME_IMAGE_SIZE, HOME_IMAGE_SIZE), Image.Resampling.LANCZOS)
     home_img = ImageTk.PhotoImage(im)
     return home_img
  
