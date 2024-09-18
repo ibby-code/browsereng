@@ -11,6 +11,7 @@ from functools import partial
 from PIL import ImageTk, Image
 from css_parser import CSSParser, Selector
 
+DEFAULT_BROWSER_TITLE = "CanYouBrowseIt"
 BG_DEFAULT_COLOR = "white"
 DEFAULT_FILE = "file://test.html"
 DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
@@ -292,7 +293,7 @@ class Browser:
         self.tabs: list[Tab] = []
         self.active_tab: Tab | None = None
         self.window = tkinter.Tk()
-        self.window.title("CanYouBrowseIt")
+        self.window.title(DEFAULT_BROWSER_TITLE)
         self.window.bind("<Key>", partial(self.handle_event, Event.KEY))
         self.window.bind("<Return>", partial(self.handle_event, Event.ENTER))
         self.window.bind("<BackSpace>", partial(self.handle_event, Event.BACKSPACE))
@@ -376,6 +377,8 @@ class Browser:
 
     def draw(self):
         self.canvas.delete(CLEARABLE_CONTENT_TAG)
+        title = self.active_tab.title if self.active_tab.title else DEFAULT_BROWSER_TITLE
+        self.window.title(title)
         self.active_tab.draw(self.canvas, self.chrome.bottom)
         # TODO: add tabs to clearable content
         for cmd in self.chrome.paint():
@@ -386,6 +389,7 @@ class Tab:
     def __init__(self, tab_height):
         # TODO: share cache across tabs?
         self.cache = {}
+        self.title = ""
         self.history = []
         self.tab_height = tab_height
         self.scroll_offset = 0
@@ -417,9 +421,10 @@ class Tab:
             if is_view_source
             else html_parser.HTMLParser(body).parse()
         )
+        nodes_list = tree_to_list(tree, [])
         links = [
             node.attributes["href"]
-            for node in tree_to_list(tree, [])
+            for node in nodes_list
             if isinstance(node, html_parser.Element)
             and node.tag == "link"
             and node.attributes.get("rel") == "stylesheet"
@@ -441,6 +446,12 @@ class Tab:
             # print(new_rules)
             rules.extend(new_rules)
         style(tree, sorted(rules, key=cascade_priority))
+        titles = [
+            node.children[0].text 
+            for node in nodes_list
+            if isinstance(node, html_parser.Element) and node.tag == "title"
+        ]
+        self.title = titles[0] if len(titles) else "" 
 
         self.document = layout.DocumentLayout(tree)
         self.document.layout()
