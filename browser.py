@@ -6,6 +6,7 @@ import tkinter.font
 import url
 from dataclasses import dataclass
 from display_constants import *
+from enum import Enum
 from functools import partial
 from PIL import ImageTk, Image
 from css_parser import CSSParser, Selector
@@ -26,6 +27,17 @@ INHERITED_PROPERTIES = {
 }
 
 CLEARABLE_CONTENT_TAG = "clearable"
+
+class Focusable(Enum):
+    ADDRESS_BAR = "address bar"
+
+class Event(Enum):
+    KEY = "<KEY>"
+    ENTER = "<RETURN>"
+    BACKSPACE = "backspace"
+    LEFT_ARROW = "left_arrow"
+    RIGHT_ARROW = "right_arrow"
+    ESCAPE = "escape"
 
 class Chrome:
     def __init__(self, browser):
@@ -64,15 +76,62 @@ class Chrome:
             WIDTH - self.padding,
             self.urlbar_bottom - self.padding
         )
+        self.focus = None
+        self.address_bar_value = ""
+        self.address_cursor_index = 0
     
     def click(self, x, y):
+        self.focus = None
         if self.newtab_rect.containsPoint(x, y):
             self.browser.new_tab(DEFAULT_FILE)
+        elif self.back_rect.containsPoint(x, y):
+            self.browser.active_tab.go_back()
+        elif self.home_rect.containsPoint(x, y):
+            self.browser.active_tab.load(DEFAULT_FILE)
+        elif self.address_rect.containsPoint(x, y):
+            self.focus = Focusable.ADDRESS_BAR
+            self.address_bar_value = ""
+            self.address_cursor_index = 0
         else:
             for i, tab in enumerate(self.browser.tabs):
                 if self.tab_rect(i).containsPoint(x, y):
                     self.browser.active_tab = tab
                     break
+    
+    def keypress(self, char: str) -> bool:
+        if self.focus == Focusable.ADDRESS_BAR:
+            self.address_bar_value = self.address_bar_value[:self.address_cursor_index] + char + self.address_bar_value[self.address_cursor_index:] 
+            self.address_cursor_index = min(self.address_cursor_index + 1, len(self.address_bar_value)) 
+            return True 
+        return False
+
+    def backspace(self) -> bool:
+        if self.focus == Focusable.ADDRESS_BAR:
+            self.address_bar_value = self.address_bar_value[:self.address_cursor_index - 1] + self.address_bar_value[self.address_cursor_index:] 
+            self.address_cursor_index = max(self.address_cursor_index - 1, 0) 
+            return True 
+        return False
+    
+    def arrow_key(self, event: Event):
+        if self.focus == Focusable.ADDRESS_BAR:
+            increment = 1 if event == Event.RIGHT_ARROW else -1
+            new_val = self.address_cursor_index + increment
+            self.address_cursor_index = min(max(new_val, 0), len(self.address_bar_value))
+            return True
+        return False
+    
+    def enter(self) -> bool:
+        if self.focus == Focusable.ADDRESS_BAR:
+            self.browser.active_tab.load(self.address_bar_value)
+            self.focus = None
+            return True 
+        return False
+    
+    def escape(self):
+        if self.focus:
+            self.focus = None
+            return True
+        return False
     
     def tab_rect(self, i):
         tabs_start = self.newtab_rect.right + self.padding
@@ -95,7 +154,7 @@ class Chrome:
         cmds.append(layout.DrawText(
             self.newtab_rect.left + self.padding,
             self.newtab_rect.top,
-            "+", self.font, "black"))
+            "+", self.font, "black", tags=[POINTER_HOVER_TAG]))
         # draw tabs
         for i, tab in enumerate(self.browser.tabs):
             bounds = self.tab_rect(i)
@@ -106,7 +165,7 @@ class Chrome:
                 "black", 1))
             cmds.append(layout.DrawText(
                 bounds.left + self.padding, bounds.top + self.padding,
-                "Tab {}".format(i), self.font, "black"))
+                "Tab {}".format(i), self.font, "black", tags=[POINTER_HOVER_TAG]))
             if tab == self.browser.active_tab:
                 cmds.append(layout.DrawLine(layout.Rect(
                     0, bounds.bottom, bounds.left, bounds.bottom),
@@ -119,20 +178,34 @@ class Chrome:
         cmds.append(layout.DrawText(
             self.back_rect.left + self.padding,
             self.back_rect.top,
-            "<", self.font, "black"))
+            "<", self.font, "black", tags=[POINTER_HOVER_TAG]))
         # draw home button
         cmds.append(layout.DrawOutline(self.home_rect, "black", 1))
         cmds.append(layout.DrawText(
             self.home_rect.left + self.padding,
             self.home_rect.top,
-            "H", self.font, "black"))
+            "H", self.font, "black", tags=[POINTER_HOVER_TAG]))
         # draw address bar
         cmds.append(layout.DrawOutline(self.address_rect, "black", 1))
         url = str(self.browser.active_tab.url)
-        cmds.append(layout.DrawText(
-            self.address_rect.left + self.padding,
-            self.address_rect.top,
-            url, self.font, "black"))
+        if self.focus == Focusable.ADDRESS_BAR:
+            cmds.append(layout.DrawText(
+                self.address_rect.left + self.padding,
+                self.address_rect.top,
+                self.address_bar_value, self.font, "black"))
+            w = self.font.measure(self.address_bar_value[:self.address_cursor_index])
+            cmds.append(layout.DrawLine(layout.Rect(
+                self.address_rect.left + self.padding + w,
+                self.address_rect.top,
+                self.address_rect.left + self.padding + w,
+                self.address_rect.bottom),
+                "red", 1
+            ))
+        else:
+            cmds.append(layout.DrawText(
+                self.address_rect.left + self.padding,
+                self.address_rect.top,
+                url, self.font, "black"))
         return cmds
 
 class Browser:
@@ -141,6 +214,12 @@ class Browser:
         self.active_tab: Tab|None = None
         self.window = tkinter.Tk()
         self.window.title("CanYouBrowseIt")
+        self.window.bind("<Key>", partial(self.handle_event, Event.KEY))
+        self.window.bind("<Return>", partial(self.handle_event, Event.ENTER))
+        self.window.bind("<BackSpace>", partial(self.handle_event, Event.BACKSPACE))
+        self.window.bind("<Right>", partial(self.handle_event, Event.RIGHT_ARROW))
+        self.window.bind("<Left>", partial(self.handle_event, Event.LEFT_ARROW))
+        self.window.bind("<Escape>", partial(self.handle_event, Event.ESCAPE))
         self.window.bind("<Button-1>", self.click)
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
@@ -168,13 +247,30 @@ class Browser:
     def click(self, e):
         # being called for clicks on home button / entry bar
         if e.y < self.chrome.bottom:
-            print("chrome click")
             self.chrome.click(e.x, e.y)
         else:
             tab_y = e.y - self.chrome.bottom
             self.active_tab.click(e.x, tab_y)
         self.draw()
-
+    
+    def handle_event(self, event: Event, e: tkinter.Event):
+        should_draw = False
+        match event:
+            case Event.ENTER:
+                should_draw = self.chrome.enter()
+            case Event.BACKSPACE:
+                should_draw = self.chrome.backspace()
+            case Event.LEFT_ARROW|Event.RIGHT_ARROW:
+                should_draw = self.chrome.arrow_key(event)
+            case Event.ESCAPE:
+                should_draw = self.chrome.escape()
+            case Event.KEY:
+                if len(e.char) == 0: return
+                if not (0x20 <= ord(e.char) < 0x7f): return
+                should_draw = self.chrome.keypress(e.char)
+        if should_draw:
+            self.draw()
+    
     def set_cursor(self, cursor, e):
         # print("set cursor", cursor)
         self.canvas.config(cursor=cursor)
@@ -186,9 +282,6 @@ class Browser:
             self.active_tab.load(url_value)
             self.draw()
 
-    def load_home_url(self):
-        self.active_tab.load(DEFAULT_FILE)
-   
     def new_tab(self, url):
         new_tab = Tab(HEIGHT - self.chrome.bottom)
         new_tab.load(url)
@@ -207,6 +300,7 @@ class Tab:
     def __init__(self, tab_height):
         # TODO: share cache across tabs?
         self.cache = {}
+        self.history = []
         self.tab_height = tab_height
         self.scroll_offset = 0
         self.url = None
@@ -214,6 +308,7 @@ class Tab:
 
     def load(self, input: str|url.URL):
         print("loading:", input)
+        self.history.append(input)
         self.scroll_offset = 0
         is_view_source = False
         if isinstance(input, str):
@@ -281,6 +376,12 @@ class Tab:
             print(f"storing at {time.time()} with {cache_time}")
             self.cache[url] = (body, time.time(), cache_time)
 
+    def go_back(self):
+        if len(self.history) > 1:
+            self.history.pop()
+            back = self.history.pop()
+            self.load(back)
+    
     def draw(self, canvas, offset):
         for cmd in self.display_list:
             if cmd.rect.top> self.scroll_offset + self.tab_height:
