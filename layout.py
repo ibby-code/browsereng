@@ -7,19 +7,52 @@ from display_constants import *
 from PIL import ImageTk
 
 BLOCK_ELEMENTS = [
-    "html", "body", "article", "section", "nav", "aside",
-    "h1", "h2", "h3", "h4", "h5", "h6", "hgroup", "header",
-    "footer", "address", "p", "hr", "pre", "blockquote",
-    "ol", "ul", "menu", "li", "dl", "dt", "dd", "figure",
-    "figcaption", "main", "div", "table", "form", "fieldset",
-    "legend", "details", "summary"
+    "html",
+    "body",
+    "article",
+    "section",
+    "nav",
+    "aside",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hgroup",
+    "header",
+    "footer",
+    "address",
+    "p",
+    "hr",
+    "pre",
+    "blockquote",
+    "ol",
+    "ul",
+    "menu",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "figure",
+    "figcaption",
+    "main",
+    "div",
+    "table",
+    "form",
+    "fieldset",
+    "legend",
+    "details",
+    "summary",
 ]
 
-TEXTLIKE_ELEMENTS = ['a', 'b', 'i', 'small', 'big', 'sub', 'sup', 'span']
+TEXTLIKE_ELEMENTS = ["a", "b", "i", "small", "big", "sub", "sup", "span"]
 
-PIXEL_VALUE_REGEX = r'(\d+)px'
+PIXEL_VALUE_REGEX = r"(\d+)px"
 
 FONT_CACHE = {}
+
+
 def get_font(font_family, size, weight, font_style):
     key = (font_family, size, weight, font_style)
     if key not in FONT_CACHE:
@@ -33,8 +66,10 @@ def get_font(font_family, size, weight, font_style):
         FONT_CACHE[key] = (font, label)
     return FONT_CACHE[key][0]
 
+
 def is_inline_display(node: Node) -> bool:
-    return isinstance(node, Text) or node.style["display"] == DisplayValue.INLINE.value 
+    return isinstance(node, Text) or node.style["display"] == DisplayValue.INLINE.value
+
 
 @dataclass
 class Rect:
@@ -44,8 +79,8 @@ class Rect:
     bottom: int
 
     def containsPoint(self, x, y):
-        return x >= self.left and x < self.right \
-            and y >= self.top and y < self.bottom
+        return x >= self.left and x < self.right and y >= self.top and y < self.bottom
+
 
 @dataclass
 class DrawOutline:
@@ -53,12 +88,16 @@ class DrawOutline:
     color: str
     thickness: int
 
-    def execute(self, scroll, canvas): 
+    def execute(self, scroll, canvas):
         canvas.create_rectangle(
-            self.rect.left, self.rect.top - scroll,
-            self.rect.right, self.rect.bottom - scroll,
+            self.rect.left,
+            self.rect.top - scroll,
+            self.rect.right,
+            self.rect.bottom - scroll,
             width=self.thickness,
-            outline=self.color)
+            outline=self.color,
+        )
+
 
 @dataclass
 class DrawLine:
@@ -66,12 +105,16 @@ class DrawLine:
     color: str
     thickness: int
 
-    def execute(self, scroll, canvas): 
+    def execute(self, scroll, canvas):
         canvas.create_line(
-            self.rect.left, self.rect.top - scroll,
-            self.rect.right, self.rect.bottom - scroll,
+            self.rect.left,
+            self.rect.top - scroll,
+            self.rect.right,
+            self.rect.bottom - scroll,
             width=self.thickness,
-            fill=self.color)
+            fill=self.color,
+        )
+
 
 @dataclass
 class DrawImage:
@@ -80,41 +123,42 @@ class DrawImage:
     image: ImageTk.PhotoImage
     tags: list[str] = field(kw_only=True, default_factory=list)
 
-    def execute(self, scroll, canvas, tags = []):
+    def execute(self, scroll, canvas, tags=[]):
         tags.extend(self.tags)
         canvas.create_image(
-            self.left,
-            self.top - scroll,
-            anchor="nw",
-            image=self.image,
-            tags=tags
+            self.left, self.top - scroll, anchor="nw", image=self.image, tags=tags
         )
- 
+
+
 @dataclass()
 class DrawText:
     left: int
     top: int
     text: str
-    font: 'tkinter.font.Font'
+    font: "tkinter.font.Font"
     color: str
-    bottom: int =  field(init=False)
-    rect: Rect = field(init = False)
+    bottom: int = field(init=False)
+    rect: Rect = field(init=False)
     tags: list[str] = field(kw_only=True, default_factory=list)
 
     def __post_init__(self):
         self.bottom = self.top + self.font.metrics("linespace")
-        self.rect = Rect(self.left, self.top, self.left + self.font.measure(self.text), self.bottom)
+        self.rect = Rect(
+            self.left, self.top, self.left + self.font.measure(self.text), self.bottom
+        )
 
-    def execute(self, scroll, canvas, tags = []):
+    def execute(self, scroll, canvas, tags=[]):
         tags.extend(self.tags)
         canvas.create_text(
-            self.left, self.top - scroll,
+            self.left,
+            self.top - scroll,
             text=self.text,
             font=self.font,
             fill=self.color,
             anchor="nw",
-            tags=tags
+            tags=tags,
         )
+
 
 @dataclass()
 class DrawRect:
@@ -122,24 +166,29 @@ class DrawRect:
     color: str
     tags: list[str] = field(kw_only=True, default_factory=list)
 
-    def execute(self, scroll, canvas, tags = []):
+    def execute(self, scroll, canvas, tags=[]):
         tags.extend(self.tags)
         canvas.create_rectangle(
-            self.rect.left, self.rect.top - scroll,
-            self.rect.right, self.rect.bottom - scroll,
+            self.rect.left,
+            self.rect.top - scroll,
+            self.rect.right,
+            self.rect.bottom - scroll,
             width=0,
             fill=self.color,
-            tags=tags
+            tags=tags,
         )
 
+
 class VerticalAlign(Enum):
-    BASELINE = 'baseline'
-    SUB = 'sub'
-    SUPER = 'super'
+    BASELINE = "baseline"
+    SUB = "sub"
+    SUPER = "super"
+
 
 class DisplayValue(Enum):
-    BLOCK = 'block'
-    INLINE = 'inline'
+    BLOCK = "block"
+    INLINE = "inline"
+
 
 class DocumentLayout:
     def __init__(self, node):
@@ -157,12 +206,13 @@ class DocumentLayout:
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
-        self.y = 0 
+        self.y = 0
         child.layout()
         self.height = child.height
 
     def paint(self):
         return []
+
 
 class BlockLayout:
     def __init__(self, node, parent, previous):
@@ -191,19 +241,22 @@ class BlockLayout:
         if isinstance(self.node, Text):
             return DisplayValue.INLINE
         # default to block display if here are both
-        elif any([isinstance(child, Element) and \
-                child.style["display"] == DisplayValue.BLOCK.value
-                for child in self.node.children]):
+        elif any(
+            [
+                isinstance(child, Element)
+                and child.style["display"] == DisplayValue.BLOCK.value
+                for child in self.node.children
+            ]
+        ):
             return DisplayValue.BLOCK
         elif self.node.children:
             return DisplayValue.INLINE
         else:
             return DisplayValue.BLOCK
-    
-   
+
     def layout(self):
         self.x = self.parent.x
-        match = re.search(PIXEL_VALUE_REGEX, self.node.style.get('width', ''))
+        match = re.search(PIXEL_VALUE_REGEX, self.node.style.get("width", ""))
         if match:
             self.width = int(match.group(1))
         else:
@@ -218,21 +271,26 @@ class BlockLayout:
             block_nodes_buffer = []
             for child in self.node.children:
                 # hide the <head> tag
-                if isinstance(child, Element) and child.tag == "head": continue
+                if isinstance(child, Element) and child.tag == "head":
+                    continue
                 if is_inline_display(child):
                     block_nodes_buffer.append(child)
                     continue
                 elif block_nodes_buffer:
-                    anon_box = create_anon_block(self.node, self.node.style, block_nodes_buffer)
+                    anon_box = create_anon_block(
+                        self.node, self.node.style, block_nodes_buffer
+                    )
                     previous = BlockLayout(anon_box, self, previous)
                     self.children.append(previous)
                     block_nodes_buffer = []
-                    
+
                 nxt = BlockLayout(child, self, previous)
                 self.children.append(nxt)
                 previous = nxt
             if block_nodes_buffer:
-                anon_box = create_anon_block(self.node, self.node.style, block_nodes_buffer)
+                anon_box = create_anon_block(
+                    self.node, self.node.style, block_nodes_buffer
+                )
                 nxt = BlockLayout(anon_box, self, previous)
                 self.children.append(nxt)
         else:
@@ -241,13 +299,13 @@ class BlockLayout:
         for child in self.children:
             child.layout()
 
-        match = re.search(PIXEL_VALUE_REGEX, self.node.style.get('height', ''))
+        match = re.search(PIXEL_VALUE_REGEX, self.node.style.get("height", ""))
         # override normal height with css
         if match:
             self.height = int(match.group(1))
         else:
             self.height = sum([child.height for child in self.children])
-    
+
     def recurse(self, tree):
         if isinstance(tree, Text):
             for word in tree.text.split():
@@ -258,18 +316,18 @@ class BlockLayout:
             for child in tree.children:
                 self.recurse(child)
 
-  
     def word(self, node, word):
         weight = node.style["font-weight"]
         # only support family for now (not serif)
-        font_family = node.style["font-family"].split(',')[0].strip('"' + "'")
+        font_family = node.style["font-family"].split(",")[0].strip('"' + "'")
         font_style = node.style["font-style"]
-        if font_style == "normal": font_style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * .75)
-        font =  get_font(font_family, size, weight, font_style)
+        if font_style == "normal":
+            font_style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * 0.75)
+        font = get_font(font_family, size, weight, font_style)
         text_width = font.measure(word)
- 
-       # if there is no horizontal space, write current line
+
+        # if there is no horizontal space, write current line
         if self.cursor_x + text_width > self.width:
             self.new_line()
 
@@ -277,16 +335,17 @@ class BlockLayout:
         previous_word = line.children[-1] if line.children else None
         text = TextLayout(node, word, line, previous_word)
         line.children.append(text)
-        self.cursor_x += text_width 
+        self.cursor_x += text_width
         # we should think about when to add a space
         if previous_word:
             self.cursor_x += font.measure(" ")
-  
+
     def new_line(self):
-        self.cursor_x = 0 
+        self.cursor_x = 0
         last_line = self.children[-1] if self.children else None
         new_line = LineLayout(self.node, self, last_line)
         self.children.append(new_line)
+
 
 class LineLayout:
     def __init__(self, node, parent, previous):
@@ -295,7 +354,7 @@ class LineLayout:
         self.previous = previous
         self.height = 0
         self.children = []
-    
+
     def paint(self):
         return []
 
@@ -307,7 +366,8 @@ class LineLayout:
             self.y = self.previous.y + self.previous.height
         else:
             self.y = self.parent.y
-        if not self.children: return
+        if not self.children:
+            return
         for word in self.children:
             word.layout()
 
@@ -316,15 +376,18 @@ class LineLayout:
         max_descent = max([metric["descent"] for metric in font_metrics])
         baseline = self.y + LEADING_FACTOR * max_ascent
         for word in self.children:
-            vertical_align = word.node.style.get("vertical-align", VerticalAlign.BASELINE)
+            vertical_align = word.node.style.get(
+                "vertical-align", VerticalAlign.BASELINE
+            )
             match vertical_align:
                 case VerticalAlign.BASELINE:
                     word.y = baseline - word.font.metrics("ascent")
                 case VerticalAlign.SUPER:
-                    word.y = baseline - max_ascent 
+                    word.y = baseline - max_ascent
                 case VerticalAlign.SUB:
                     word.y = (baseline + max_descent) - word.font.metrics("linespace")
         self.height = 1.25 * (max_ascent + max_descent)
+
 
 class TextLayout:
     def __init__(self, node, word, parent, previous):
@@ -333,7 +396,7 @@ class TextLayout:
         self.children = []
         self.parent = parent
         self.previous = previous
-    
+
     def paint(self):
         color = self.node.style["color"]
         tags = []
@@ -342,19 +405,20 @@ class TextLayout:
             tags.append(POINTER_HOVER_TAG)
 
         return [DrawText(self.x, self.y, self.word, self.font, color, tags=tags)]
-    
+
     def layout(self):
         weight = self.node.style["font-weight"]
         # only support family for now (not serif)
-        font_family = self.node.style["font-family"].split(',')[0].strip('"' + "'")
+        font_family = self.node.style["font-family"].split(",")[0].strip('"' + "'")
         font_style = self.node.style["font-style"]
         # should prob use stylesheet for this
-        if font_style == "normal": font_style = "roman"
+        if font_style == "normal":
+            font_style = "roman"
         # assumes pixels
-        size = int(float(self.node.style["font-size"][:-2]) * .75)
-        self.font =  get_font(font_family, size, weight, font_style)
+        size = int(float(self.node.style["font-size"][:-2]) * 0.75)
+        self.font = get_font(font_family, size, weight, font_style)
         self.width = self.font.measure(self.word)
- 
+
         # calculate word position
         if self.previous:
             # we should think about when to add a space

@@ -4,6 +4,7 @@ import ssl
 HTTP_SCHEMES = ["http", "https", "view-source"]
 REDIRECT_LIMIT = 5
 
+
 class URL:
     def __init__(self, url: str):
         self.socket = None
@@ -26,18 +27,20 @@ class URL:
             elif self.scheme == "https":
                 self.port = 443
         else:
-            self.host = '' 
+            self.host = ""
             self.port = 0
-            self.path = url 
-    
+            self.path = url
+
     def get_id(self):
         return f"{self.scheme}://{self.host}:{self.port}{self.path}"
 
     def __str__(self) -> str:
         port_part = ":" + str(self.port)
-        if not self.port or \
-            (self.scheme == "https" and self.port == 443) or \
-            (self.scheme == "http" and self.port == 80):
+        if (
+            not self.port
+            or (self.scheme == "https" and self.port == 443)
+            or (self.scheme == "http" and self.port == 80)
+        ):
             port_part = ""
         return self.scheme + "://" + self.host + port_part + self.path
 
@@ -49,10 +52,11 @@ class URL:
 
     def __hash__(self):
         return hash((self.get_id()))
-    
+
     # trying to make this work for files
     def resolve(self, url: str):
-        if "://" in url: return URL(url)
+        if "://" in url:
+            return URL(url)
         if self.scheme == "file":
             if "/" in url and "/" in self.path:
                 url = get_relative_url(self.path.rsplit("/", 1)[0] + "/", url)
@@ -61,9 +65,14 @@ class URL:
         if url.startswith("//"):
             return URL(self.scheme + ":" + url)
         else:
-            base = self.scheme + "://" + self.host + (":" + str(self.port) if self.port else "")
-            if not base.endswith('/') and not url.startswith('/'):
-                base += '/'
+            base = (
+                self.scheme
+                + "://"
+                + self.host
+                + (":" + str(self.port) if self.port else "")
+            )
+            if not base.endswith("/") and not url.startswith("/"):
+                base += "/"
             return URL(base + url)
 
     def request(self):
@@ -75,7 +84,7 @@ class URL:
         elif self.scheme == "data":
             return self.make_data_request()
 
-    def make_http_request(self, redirect = 0):
+    def make_http_request(self, redirect=0):
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -109,21 +118,26 @@ class URL:
 
         assert status.isnumeric()
         status = int(status)
-    
+
         # handle redirects in 300 range
-        if status > 299 and status < 400 and 'location' in response_headers and redirect < REDIRECT_LIMIT:
+        if (
+            status > 299
+            and status < 400
+            and "location" in response_headers
+            and redirect < REDIRECT_LIMIT
+        ):
             raw_response.close()
-            location = response_headers['location']
+            location = response_headers["location"]
             redirect_url = URL(location)
             print(f"redirect {redirect} to {location}")
             if self.can_use_same_socket(redirect_url):
-                self.path = redirect_url.path 
-                return self.make_http_request(redirect = redirect + 1)
+                self.path = redirect_url.path
+                return self.make_http_request(redirect=redirect + 1)
             else:
-                return redirect_url.make_http_request(redirect = redirect + 1)
+                return redirect_url.make_http_request(redirect=redirect + 1)
         elif status > 299 and status < 400 and redirect >= REDIRECT_LIMIT:
             raw_response.close()
-            location = response_headers['location']
+            location = response_headers["location"]
             return (f"Redirect loop detected! Last redirect is to :{location}", 0)
 
         # fail unsupported headers
@@ -133,7 +147,7 @@ class URL:
         # respect content-length
         if "content-length" in response_headers:
             content_length = int(response_headers["content-length"])
-            content = raw_response.read(content_length).decode("utf-8") 
+            content = raw_response.read(content_length).decode("utf-8")
         else:
             content = raw_response.read().decode("utf-8")
         raw_response.close()
@@ -141,11 +155,11 @@ class URL:
         # get time content should be cached
         cache_time = 0
         if "cache-control" in response_headers:
-            cache_directives = response_headers["cache-control"].split(',')
+            cache_directives = response_headers["cache-control"].split(",")
             for directive in cache_directives:
-                if directive.casefold().startswith('max-age'):
-                    cache_time = int(directive.split('=')[1])
-                elif directive.casefold() == 'nostore':
+                if directive.casefold().startswith("max-age"):
+                    cache_time = int(directive.split("=")[1])
+                elif directive.casefold() == "nostore":
                     cache_time = 0
                     break
         return content, cache_time
@@ -160,10 +174,15 @@ class URL:
         return message, 0
 
     def can_use_same_socket(self, urlB):
-        return self.scheme == urlB.scheme and self.host == urlB.host and self.port == urlB.port
+        return (
+            self.scheme == urlB.scheme
+            and self.host == urlB.host
+            and self.port == urlB.port
+        )
+
 
 def get_relative_url(original, new):
-    if new.startswith('/'):
+    if new.startswith("/"):
         return new
     dir, _ = original.rsplit("/", 1)
     while new.startswith("../"):

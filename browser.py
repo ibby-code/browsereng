@@ -29,8 +29,10 @@ INHERITED_PROPERTIES = {
 
 CLEARABLE_CONTENT_TAG = "clearable"
 
+
 class Focusable(Enum):
     ADDRESS_BAR = "address bar"
+
 
 class Event(Enum):
     KEY = "<KEY>"
@@ -39,6 +41,7 @@ class Event(Enum):
     LEFT_ARROW = "left_arrow"
     RIGHT_ARROW = "right_arrow"
     ESCAPE = "escape"
+
 
 class Chrome:
     def __init__(self, browser):
@@ -53,34 +56,39 @@ class Chrome:
         self.bottom = self.urlbar_bottom
 
         plus_width = self.font.measure("+") + 2 * self.padding
-        self.newtab_rect = layout.Rect(self.padding, self.padding, self.padding + plus_width, self.padding + self.font_height)
+        self.newtab_rect = layout.Rect(
+            self.padding,
+            self.padding,
+            self.padding + plus_width,
+            self.padding + self.font_height,
+        )
 
         back_width = self.font.measure("<") + 2 * self.padding
         self.back_rect = layout.Rect(
             self.padding,
             self.urlbar_top + self.padding,
             self.padding + back_width,
-            self.urlbar_bottom - self.padding
+            self.urlbar_bottom - self.padding,
         )
- 
+
         home_width = HOME_IMAGE_SIZE + 2 * self.padding
         self.home_rect = layout.Rect(
             self.padding + self.back_rect.right,
             self.urlbar_top + self.padding,
             self.padding + home_width + self.back_rect.right,
-            self.urlbar_bottom - self.padding
+            self.urlbar_bottom - self.padding,
         )
 
         self.address_rect = layout.Rect(
             self.padding + self.home_rect.right,
             self.urlbar_top + self.padding,
             WIDTH - self.padding,
-            self.urlbar_bottom - self.padding
+            self.urlbar_bottom - self.padding,
         )
         self.focus = None
         self.address_bar_value = ""
         self.address_cursor_index = 0
-    
+
     def click(self, x, y):
         self.focus = None
         if self.newtab_rect.containsPoint(x, y):
@@ -98,127 +106,191 @@ class Chrome:
                 if self.tab_rect(i).containsPoint(x, y):
                     self.browser.active_tab = tab
                     break
-    
+
     def keypress(self, char: str) -> bool:
         if self.focus == Focusable.ADDRESS_BAR:
-            self.address_bar_value = self.address_bar_value[:self.address_cursor_index] + char + self.address_bar_value[self.address_cursor_index:] 
-            self.address_cursor_index = min(self.address_cursor_index + 1, len(self.address_bar_value)) 
-            return True 
+            self.address_bar_value = (
+                self.address_bar_value[: self.address_cursor_index]
+                + char
+                + self.address_bar_value[self.address_cursor_index :]
+            )
+            self.address_cursor_index = min(
+                self.address_cursor_index + 1, len(self.address_bar_value)
+            )
+            return True
         return False
 
     def backspace(self) -> bool:
         if self.focus == Focusable.ADDRESS_BAR:
-            self.address_bar_value = self.address_bar_value[:self.address_cursor_index - 1] + self.address_bar_value[self.address_cursor_index:] 
-            self.address_cursor_index = max(self.address_cursor_index - 1, 0) 
-            return True 
+            self.address_bar_value = (
+                self.address_bar_value[: self.address_cursor_index - 1]
+                + self.address_bar_value[self.address_cursor_index :]
+            )
+            self.address_cursor_index = max(self.address_cursor_index - 1, 0)
+            return True
         return False
-    
+
     def arrow_key(self, event: Event):
         if self.focus == Focusable.ADDRESS_BAR:
             increment = 1 if event == Event.RIGHT_ARROW else -1
             new_val = self.address_cursor_index + increment
-            self.address_cursor_index = min(max(new_val, 0), len(self.address_bar_value))
+            self.address_cursor_index = min(
+                max(new_val, 0), len(self.address_bar_value)
+            )
             return True
         return False
-    
+
     def enter(self) -> bool:
         if self.focus == Focusable.ADDRESS_BAR:
             self.browser.active_tab.load(self.address_bar_value)
             self.focus = None
-            return True 
+            return True
         return False
-    
+
     def escape(self):
         if self.focus:
             self.focus = None
             return True
         return False
-    
+
     def tab_rect(self, i):
         tabs_start = self.newtab_rect.right + self.padding
-        tab_width = self.font.measure("Tab X") + 2*self.padding
+        tab_width = self.font.measure("Tab X") + 2 * self.padding
         return layout.Rect(
-            tabs_start + tab_width * i, self.tabbar_top,
-            tabs_start + tab_width * (i + 1), self.tabbar_bottom)
-    
+            tabs_start + tab_width * i,
+            self.tabbar_top,
+            tabs_start + tab_width * (i + 1),
+            self.tabbar_bottom,
+        )
+
     def paint(self):
         cmds = []
         # add background for chrome
-        cmds.append(layout.DrawRect(
-            layout.Rect(0, 0, WIDTH, self.bottom),
-            "white"))
-        cmds.append(layout.DrawLine(
-            layout.Rect(0, self.bottom, WIDTH,
-            self.bottom), "black", 1))
+        cmds.append(layout.DrawRect(layout.Rect(0, 0, WIDTH, self.bottom), "white"))
+        cmds.append(
+            layout.DrawLine(layout.Rect(0, self.bottom, WIDTH, self.bottom), "black", 1)
+        )
         # add new tab button
         cmds.append(layout.DrawOutline(self.newtab_rect, "black", 1))
-        cmds.append(layout.DrawText(
-            self.newtab_rect.left + self.padding,
-            self.newtab_rect.top,
-            "+", self.font, "black", tags=[POINTER_HOVER_TAG]))
+        cmds.append(
+            layout.DrawText(
+                self.newtab_rect.left + self.padding,
+                self.newtab_rect.top,
+                "+",
+                self.font,
+                "black",
+                tags=[POINTER_HOVER_TAG],
+            )
+        )
         # draw tabs
         for i, tab in enumerate(self.browser.tabs):
             bounds = self.tab_rect(i)
-            cmds.append(layout.DrawLine(layout.Rect(bounds.left, 0, bounds.left, bounds.bottom),
-                "black", 1))
-            cmds.append(layout.DrawLine(layout.Rect(
-                bounds.right, 0, bounds.right, bounds.bottom),
-                "black", 1))
-            cmds.append(layout.DrawText(
-                bounds.left + self.padding, bounds.top + self.padding,
-                "Tab {}".format(i), self.font, "black", tags=[POINTER_HOVER_TAG]))
+            cmds.append(
+                layout.DrawLine(
+                    layout.Rect(bounds.left, 0, bounds.left, bounds.bottom), "black", 1
+                )
+            )
+            cmds.append(
+                layout.DrawLine(
+                    layout.Rect(bounds.right, 0, bounds.right, bounds.bottom),
+                    "black",
+                    1,
+                )
+            )
+            cmds.append(
+                layout.DrawText(
+                    bounds.left + self.padding,
+                    bounds.top + self.padding,
+                    "Tab {}".format(i),
+                    self.font,
+                    "black",
+                    tags=[POINTER_HOVER_TAG],
+                )
+            )
             if tab == self.browser.active_tab:
-                cmds.append(layout.DrawLine(layout.Rect(
-                    0, bounds.bottom, bounds.left, bounds.bottom),
-                    "black", 1))
-                cmds.append(layout.DrawLine(layout.Rect(
-                    bounds.right, bounds.bottom, WIDTH, bounds.bottom),
-                    "black", 1))
+                cmds.append(
+                    layout.DrawLine(
+                        layout.Rect(0, bounds.bottom, bounds.left, bounds.bottom),
+                        "black",
+                        1,
+                    )
+                )
+                cmds.append(
+                    layout.DrawLine(
+                        layout.Rect(bounds.right, bounds.bottom, WIDTH, bounds.bottom),
+                        "black",
+                        1,
+                    )
+                )
         # draw back button
         cmds.append(layout.DrawOutline(self.back_rect, "black", 1))
-        cmds.append(layout.DrawText(
-            self.back_rect.left + self.padding,
-            self.back_rect.top,
-            "<", self.font, "black", tags=[POINTER_HOVER_TAG]))
+        cmds.append(
+            layout.DrawText(
+                self.back_rect.left + self.padding,
+                self.back_rect.top,
+                "<",
+                self.font,
+                "black",
+                tags=[POINTER_HOVER_TAG],
+            )
+        )
         # draw home button
         cmds.append(layout.DrawOutline(self.home_rect, "black", 1))
         self.image = load_home_image()
         height = self.home_rect.bottom - self.home_rect.top
-        extra_space = height - self.image.height() 
+        extra_space = height - self.image.height()
         h_padding = round(extra_space / 2)
-        cmds.append(layout.DrawImage(
-            self.home_rect.left + self.padding,
-            self.home_rect.top + h_padding,
-            self.image,
-            tags=[POINTER_HOVER_TAG]
-        ))
+        cmds.append(
+            layout.DrawImage(
+                self.home_rect.left + self.padding,
+                self.home_rect.top + h_padding,
+                self.image,
+                tags=[POINTER_HOVER_TAG],
+            )
+        )
         # draw address bar
         cmds.append(layout.DrawOutline(self.address_rect, "black", 1))
         url = str(self.browser.active_tab.url)
         if self.focus == Focusable.ADDRESS_BAR:
-            cmds.append(layout.DrawText(
-                self.address_rect.left + self.padding,
-                self.address_rect.top,
-                self.address_bar_value, self.font, "black"))
-            w = self.font.measure(self.address_bar_value[:self.address_cursor_index])
-            cmds.append(layout.DrawLine(layout.Rect(
-                self.address_rect.left + self.padding + w,
-                self.address_rect.top,
-                self.address_rect.left + self.padding + w,
-                self.address_rect.bottom),
-                "red", 1
-            ))
+            cmds.append(
+                layout.DrawText(
+                    self.address_rect.left + self.padding,
+                    self.address_rect.top,
+                    self.address_bar_value,
+                    self.font,
+                    "black",
+                )
+            )
+            w = self.font.measure(self.address_bar_value[: self.address_cursor_index])
+            cmds.append(
+                layout.DrawLine(
+                    layout.Rect(
+                        self.address_rect.left + self.padding + w,
+                        self.address_rect.top,
+                        self.address_rect.left + self.padding + w,
+                        self.address_rect.bottom,
+                    ),
+                    "red",
+                    1,
+                )
+            )
         else:
-            cmds.append(layout.DrawText(
-                self.address_rect.left + self.padding,
-                self.address_rect.top,
-                url, self.font, "black"))
+            cmds.append(
+                layout.DrawText(
+                    self.address_rect.left + self.padding,
+                    self.address_rect.top,
+                    url,
+                    self.font,
+                    "black",
+                )
+            )
         return cmds
+
 
 class Browser:
     def __init__(self):
         self.tabs: list[Tab] = []
-        self.active_tab: Tab|None = None
+        self.active_tab: Tab | None = None
         self.window = tkinter.Tk()
         self.window.title("CanYouBrowseIt")
         self.window.bind("<Key>", partial(self.handle_event, Event.KEY))
@@ -231,8 +303,12 @@ class Browser:
         self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
         self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
         self.window.bind("<MouseWheel>", self.scroll_mouse)
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR)
-        self.canvas.tag_bind(POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1"))
+        self.canvas = tkinter.Canvas(
+            self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR
+        )
+        self.canvas.tag_bind(
+            POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1")
+        )
         self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
         self.chrome = Chrome(self)
         self.canvas.pack()
@@ -246,11 +322,11 @@ class Browser:
             # mac uses multiples of 1
             offset = SCROLL_STEP * delta
         self.scroll(offset, e)
-    
+
     def scroll(self, increment, e):
         self.active_tab.scroll(increment)
         self.draw()
-    
+
     def click(self, e):
         # being called for clicks on home button / entry bar
         if e.y < self.chrome.bottom:
@@ -259,7 +335,7 @@ class Browser:
             tab_y = e.y - self.chrome.bottom
             self.active_tab.click(e.x, tab_y)
         self.draw()
-    
+
     def handle_event(self, event: Event, e: tkinter.Event):
         should_draw = False
         match event:
@@ -267,17 +343,19 @@ class Browser:
                 should_draw = self.chrome.enter()
             case Event.BACKSPACE:
                 should_draw = self.chrome.backspace()
-            case Event.LEFT_ARROW|Event.RIGHT_ARROW:
+            case Event.LEFT_ARROW | Event.RIGHT_ARROW:
                 should_draw = self.chrome.arrow_key(event)
             case Event.ESCAPE:
                 should_draw = self.chrome.escape()
             case Event.KEY:
-                if len(e.char) == 0: return
-                if not (0x20 <= ord(e.char) < 0x7f): return
+                if len(e.char) == 0:
+                    return
+                if not (0x20 <= ord(e.char) < 0x7F):
+                    return
                 should_draw = self.chrome.keypress(e.char)
         if should_draw:
             self.draw()
-    
+
     def set_cursor(self, cursor, e):
         # print("set cursor", cursor)
         self.canvas.config(cursor=cursor)
@@ -303,6 +381,7 @@ class Browser:
         for cmd in self.chrome.paint():
             cmd.execute(0, self.canvas)
 
+
 class Tab:
     def __init__(self, tab_height):
         # TODO: share cache across tabs?
@@ -313,7 +392,7 @@ class Tab:
         self.url = None
         self.display_list = []
 
-    def load(self, input: str|url.URL):
+    def load(self, input: str | url.URL):
         print("loading:", input)
         self.history.append(input)
         self.scroll_offset = 0
@@ -368,8 +447,8 @@ class Tab:
         self.display_list = []
         paint_tree(self.document, self.display_list)
         # print(self.display_list)
-    
-    def request_from_cache(self, url: url.URL) -> tuple[str, int]|None:
+
+    def request_from_cache(self, url: url.URL) -> tuple[str, int] | None:
         if url in self.cache:
             content, store_time, max_age = self.cache[url]
             print(f"retrieving at {store_time} with {max_age} at {time.time()}")
@@ -388,41 +467,50 @@ class Tab:
             self.history.pop()
             back = self.history.pop()
             self.load(back)
-    
+
     def draw(self, canvas, offset):
         for cmd in self.display_list:
-            if cmd.rect.top> self.scroll_offset + self.tab_height:
+            if cmd.rect.top > self.scroll_offset + self.tab_height:
                 continue
             if cmd.rect.bottom < self.scroll_offset + VSTEP:
                 continue
-            cmd.execute(self.scroll_offset - offset, canvas, tags=[CLEARABLE_CONTENT_TAG])
-    
+            cmd.execute(
+                self.scroll_offset - offset, canvas, tags=[CLEARABLE_CONTENT_TAG]
+            )
+
     def scroll(self, offset):
         max_y = max(self.document.height + VSTEP - self.tab_height, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
-    
+
     def click(self, x, y):
         # print("click ", x, y)
         y += self.scroll_offset
         # filter all objects that are at this spot
-        objs = [obj for obj in tree_to_list(self.document, [])
-                if obj.x <= x < obj.x + obj.width
-                and obj.y <= y < obj.y + obj.height]
+        objs = [
+            obj
+            for obj in tree_to_list(self.document, [])
+            if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
+        ]
         # print(objs)
-        if not objs: return
+        if not objs:
+            return
         elt = objs[-1].node
         # find the clickable element
         while elt:
-            if isinstance(elt, html_parser.Element) and elt.tag == "a" and "href" in elt.attributes:
+            if (
+                isinstance(elt, html_parser.Element)
+                and elt.tag == "a"
+                and "href" in elt.attributes
+            ):
                 href = elt.attributes["href"]
-                print('href', href)
+                print("href", href)
                 # ignore fragment links
                 if href.startswith("#"):
                     return
                 url = self.url.resolve(href)
                 return self.load(url)
             elt = elt.parent
-        
+
 
 def paint_tree(layout_object, display_list):
     display_list.extend(layout_object.paint())
@@ -430,12 +518,14 @@ def paint_tree(layout_object, display_list):
     for child in layout_object.children:
         paint_tree(child, display_list)
 
+
 def load_home_image():
     im = Image.open(HOME_IMAGE)
     im.thumbnail((HOME_IMAGE_SIZE, HOME_IMAGE_SIZE), Image.Resampling.LANCZOS)
     home_img = ImageTk.PhotoImage(im)
     return home_img
- 
+
+
 def style(node: html_parser.Node, rules: list[tuple[Selector, dict[str, str]]]):
     # pass down inherited or default values
     for property, default_value in INHERITED_PROPERTIES.items():
@@ -477,6 +567,7 @@ def tree_to_list(tree, list):
     for child in tree.children:
         tree_to_list(child, list)
     return list
+
 
 def cascade_priority(rule):
     selector, body = rule
