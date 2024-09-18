@@ -32,9 +32,14 @@ class URL:
     
     def get_id(self):
         return f"{self.scheme}://{self.host}:{self.port}{self.path}"
-    
+
     def __str__(self) -> str:
-        return self.get_id()
+        port_part = ":" + str(self.port)
+        if not self.port or \
+            (self.scheme == "https" and self.port == 443) or \
+            (self.scheme == "http" and self.port == 80):
+            port_part = ""
+        return self.scheme + "://" + self.host + port_part + self.path
 
     # eq and hash to allow use as key in dict
     def __eq__(self, other):

@@ -139,7 +139,7 @@ class DocumentLayout:
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
-        self.y = URL_BAR_OFFSET 
+        self.y = 0 
         child.layout()
         self.height = child.height
 

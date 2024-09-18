@@ -35,10 +35,35 @@ class Chrome:
         self.padding = 5
         self.tabbar_top = 0
         self.tabbar_bottom = self.font_height + 2 * self.padding
-        # to change
-        self.bottom = self.tabbar_bottom
+        self.urlbar_top = self.tabbar_bottom
+        self.urlbar_bottom = self.urlbar_top + self.font_height + 2 * self.padding
+        self.bottom = self.urlbar_bottom
+
         plus_width = self.font.measure("+") + 2 * self.padding
         self.newtab_rect = layout.Rect(self.padding, self.padding, self.padding + plus_width, self.padding + self.font_height)
+
+        back_width = self.font.measure("<") + 2 * self.padding
+        self.back_rect = layout.Rect(
+            self.padding,
+            self.urlbar_top + self.padding,
+            self.padding + back_width,
+            self.urlbar_bottom - self.padding
+        )
+ 
+        home_width = self.font.measure("H") + 2 * self.padding
+        self.home_rect = layout.Rect(
+            self.padding + self.back_rect.right,
+            self.urlbar_top + self.padding,
+            self.padding + home_width + self.back_rect.right,
+            self.urlbar_bottom - self.padding
+        )
+
+        self.address_rect = layout.Rect(
+            self.padding + self.home_rect.right,
+            self.urlbar_top + self.padding,
+            WIDTH - self.padding,
+            self.urlbar_bottom - self.padding
+        )
     
     def click(self, x, y):
         if self.newtab_rect.containsPoint(x, y):
@@ -89,6 +114,25 @@ class Chrome:
                 cmds.append(layout.DrawLine(layout.Rect(
                     bounds.right, bounds.bottom, WIDTH, bounds.bottom),
                     "black", 1))
+        # draw back button
+        cmds.append(layout.DrawOutline(self.back_rect, "black", 1))
+        cmds.append(layout.DrawText(
+            self.back_rect.left + self.padding,
+            self.back_rect.top,
+            "<", self.font, "black"))
+        # draw home button
+        cmds.append(layout.DrawOutline(self.home_rect, "black", 1))
+        cmds.append(layout.DrawText(
+            self.home_rect.left + self.padding,
+            self.home_rect.top,
+            "H", self.font, "black"))
+        # draw address bar
+        cmds.append(layout.DrawOutline(self.address_rect, "black", 1))
+        url = str(self.browser.active_tab.url)
+        cmds.append(layout.DrawText(
+            self.address_rect.left + self.padding,
+            self.address_rect.top,
+            url, self.font, "black"))
         return cmds
 
 class Browser:
@@ -105,8 +149,6 @@ class Browser:
         self.canvas.tag_bind(POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1"))
         self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
         self.chrome = Chrome(self)
-        self.url_value = tkinter.StringVar()
-        self.draw_url_bar()
         self.canvas.pack()
 
     def scroll_mouse(self, e):
@@ -124,6 +166,7 @@ class Browser:
         self.draw()
     
     def click(self, e):
+        # being called for clicks on home button / entry bar
         if e.y < self.chrome.bottom:
             print("chrome click")
             self.chrome.click(e.x, e.y)
@@ -159,53 +202,6 @@ class Browser:
         # TODO: add tabs to clearable content
         for cmd in self.chrome.paint():
             cmd.execute(0, self.canvas)
-
-    def draw_url_bar(self):
-        url_entry = tkinter.Entry(
-            self.window, textvariable=self.url_value, font=("Garamond", 10, "normal")
-        )
-        url_entry.bind("<Return>", self.load_url)
-        submit_button = tkinter.Button(self.window, text="Go", command=self.load_url)
-        im = Image.open(HOME_IMAGE)
-        im.thumbnail((HOME_BUTTON_WIDTH, URL_BAR_HEIGHT), Image.Resampling.LANCZOS)
-        home_img = ImageTk.PhotoImage(im)
-        home_button = tkinter.Button(
-            self.window, image=home_img, command=self.load_home_url
-        )
-        # you must save a reference to tkinter image to avoid garbage collection
-        home_button.image = home_img
-        base_y = self.chrome.bottom
-        self.canvas.create_rectangle(
-            0,
-            base_y,
-            WIDTH,
-            base_y + URL_BAR_OFFSET,
-            width=0,
-            fill="#dedede",
-        )
-        self.canvas.create_window(
-            HSTEP,
-            base_y + VSTEP,
-            window=home_button,
-            anchor="nw",
-            width=HOME_BUTTON_WIDTH,
-            height=URL_BAR_HEIGHT,
-        )
-        self.canvas.create_window(
-            HSTEP + HOME_BUTTON_WIDTH + HSTEP,
-            base_y + VSTEP,
-            window=url_entry,
-            anchor="nw",
-            height=URL_BAR_HEIGHT,
-            width=URL_BAR_WIDTH,
-        )
-        self.canvas.create_window(
-            HSTEP + HOME_BUTTON_WIDTH + HSTEP + URL_BAR_WIDTH + HSTEP,
-            base_y + VSTEP,
-            window=submit_button,
-            anchor="nw",
-            height=URL_BAR_HEIGHT,
-        )
 
 class Tab:
     def __init__(self, tab_height):
@@ -289,12 +285,12 @@ class Tab:
         for cmd in self.display_list:
             if cmd.rect.top> self.scroll_offset + self.tab_height:
                 continue
-            if cmd.rect.bottom < self.scroll_offset + URL_BAR_OFFSET + VSTEP:
+            if cmd.rect.bottom < self.scroll_offset + VSTEP:
                 continue
             cmd.execute(self.scroll_offset - offset, canvas, tags=[CLEARABLE_CONTENT_TAG])
     
     def scroll(self, offset):
-        max_y = max(self.document.height + VSTEP + URL_BAR_OFFSET - self.tab_height, 0)
+        max_y = max(self.document.height + VSTEP - self.tab_height, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
     
     def click(self, x, y):
@@ -326,7 +322,12 @@ def paint_tree(layout_object, display_list):
     for child in layout_object.children:
         paint_tree(child, display_list)
 
-
+def load_home_image():
+    im = Image.open(HOME_IMAGE)
+    im.thumbnail((20, 20), Image.Resampling.LANCZOS)
+    home_img = ImageTk.PhotoImage(im)
+    return home_img
+ 
 def style(node: html_parser.Node, rules: list[tuple[Selector, dict[str, str]]]):
     # pass down inherited or default values
     for property, default_value in INHERITED_PROPERTIES.items():
