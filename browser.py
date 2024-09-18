@@ -71,12 +71,19 @@ class Chrome:
             self.padding + back_width,
             self.urlbar_bottom - self.padding,
         )
+        forward_width = self.font.measure(">") + 2 * self.padding
+        self.forward_rect = layout.Rect(
+            self.back_rect.right,
+            self.urlbar_top + self.padding,
+            self.back_rect.right + forward_width,
+            self.urlbar_bottom - self.padding,
+        )
 
         home_width = HOME_IMAGE_SIZE + 2 * self.padding
         self.home_rect = layout.Rect(
-            self.padding + self.back_rect.right,
+            self.padding + self.forward_rect.right,
             self.urlbar_top + self.padding,
-            self.padding + home_width + self.back_rect.right,
+            self.padding + home_width + self.forward_rect.right,
             self.urlbar_bottom - self.padding,
         )
 
@@ -96,6 +103,8 @@ class Chrome:
             self.browser.new_tab(DEFAULT_FILE)
         elif self.back_rect.containsPoint(x, y):
             self.browser.active_tab.go_back()
+        elif self.forward_rect.containsPoint(x, y):
+            self.browser.active_tab.go_forward()
         elif self.home_rect.containsPoint(x, y):
             self.browser.active_tab.load(DEFAULT_FILE)
         elif self.address_rect.containsPoint(x, y):
@@ -224,15 +233,37 @@ class Chrome:
                     )
                 )
         # draw back button
-        cmds.append(layout.DrawOutline(self.back_rect, "black", 1))
+        back_tags = []
+        back_color = "grey"
+        if self.browser.active_tab.has_back_history():
+            back_tags.append(POINTER_HOVER_TAG)
+            back_color = "black"
+        cmds.append(layout.DrawOutline(self.back_rect, back_color, 1))
         cmds.append(
             layout.DrawText(
                 self.back_rect.left + self.padding,
                 self.back_rect.top,
                 "<",
                 self.font,
-                "black",
-                tags=[POINTER_HOVER_TAG],
+                back_color,
+                tags=back_tags,
+            )
+        )
+        # draw forward button
+        forward_tags = []
+        forward_color = "grey"
+        if self.browser.active_tab.has_forward_history():
+            forward_tags.append(POINTER_HOVER_TAG)
+            forward_color = "black"
+        cmds.append(layout.DrawOutline(self.forward_rect, forward_color, 1))
+        cmds.append(
+            layout.DrawText(
+                self.forward_rect.left + self.padding,
+                self.forward_rect.top,
+                ">",
+                self.font,
+                forward_color,
+                tags=forward_tags,
             )
         )
         # draw home button
@@ -390,15 +421,24 @@ class Tab:
         # TODO: share cache across tabs?
         self.cache = {}
         self.title = ""
-        self.history = []
+        self.backward_history = []
+        self.forward_history = []
         self.tab_height = tab_height
         self.scroll_offset = 0
         self.url = None
         self.display_list = []
+    
+    def has_back_history(self) -> bool:
+        return len(self.backward_history) > 1
 
-    def load(self, input: str | url.URL):
+    def has_forward_history(self) -> bool:
+        return len(self.forward_history) > 0
+
+    def load(self, input: str | url.URL, clear_forward_histpry = True):
         print("loading:", input)
-        self.history.append(input)
+        self.backward_history.append(input)
+        if clear_forward_histpry:
+            self.forward_history = []
         self.scroll_offset = 0
         is_view_source = False
         if isinstance(input, str):
@@ -474,10 +514,16 @@ class Tab:
             self.cache[url] = (body, time.time(), cache_time)
 
     def go_back(self):
-        if len(self.history) > 1:
-            self.history.pop()
-            back = self.history.pop()
-            self.load(back)
+        if len(self.backward_history) > 1:
+            current = self.backward_history.pop()
+            self.forward_history.append(current)
+            back = self.backward_history.pop()
+            self.load(back, False)
+    
+    def go_forward(self):
+        if len(self.forward_history) > 0:
+            next = self.forward_history.pop()
+            self.load(next, False)
 
     def draw(self, canvas, offset):
         for cmd in self.display_list:
