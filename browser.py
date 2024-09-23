@@ -1,3 +1,4 @@
+import draw_commands
 import layout
 import html_parser
 import time
@@ -57,7 +58,7 @@ class Chrome:
         self.bottom = self.urlbar_bottom
 
         plus_width = self.font.measure("+") + 2 * self.padding
-        self.newtab_rect = layout.Rect(
+        self.newtab_rect = draw_commands.Rect(
             self.padding,
             self.padding,
             self.padding + plus_width,
@@ -65,14 +66,14 @@ class Chrome:
         )
 
         back_width = self.font.measure("<") + 2 * self.padding
-        self.back_rect = layout.Rect(
+        self.back_rect = draw_commands.Rect(
             self.padding,
             self.urlbar_top + self.padding,
             self.padding + back_width,
             self.urlbar_bottom - self.padding,
         )
         forward_width = self.font.measure(">") + 2 * self.padding
-        self.forward_rect = layout.Rect(
+        self.forward_rect = draw_commands.Rect(
             self.back_rect.right,
             self.urlbar_top + self.padding,
             self.back_rect.right + forward_width,
@@ -80,14 +81,14 @@ class Chrome:
         )
 
         home_width = HOME_IMAGE_SIZE + 2 * self.padding
-        self.home_rect = layout.Rect(
+        self.home_rect = draw_commands.Rect(
             self.padding + self.forward_rect.right,
             self.urlbar_top + self.padding,
             self.padding + home_width + self.forward_rect.right,
             self.urlbar_bottom - self.padding,
         )
 
-        self.address_rect = layout.Rect(
+        self.address_rect = draw_commands.Rect(
             self.padding + self.home_rect.right,
             self.urlbar_top + self.padding,
             WIDTH - self.padding,
@@ -166,7 +167,7 @@ class Chrome:
     def tab_rect(self, i):
         tabs_start = self.newtab_rect.right + self.padding
         tab_width = self.font.measure("Tab X") + 2 * self.padding
-        return layout.Rect(
+        return draw_commands.Rect(
             tabs_start + tab_width * i,
             self.tabbar_top,
             tabs_start + tab_width * (i + 1),
@@ -176,14 +177,14 @@ class Chrome:
     def paint(self):
         cmds = []
         # add background for chrome
-        cmds.append(layout.DrawRect(layout.Rect(0, 0, WIDTH, self.bottom), "white"))
+        cmds.append(draw_commands.DrawRect(draw_commands.Rect(0, 0, WIDTH, self.bottom), "white"))
         cmds.append(
-            layout.DrawLine(layout.Rect(0, self.bottom, WIDTH, self.bottom), "black", 1)
+            draw_commands.DrawLine(draw_commands.Rect(0, self.bottom, WIDTH, self.bottom), "black", 1)
         )
         # add new tab button
-        cmds.append(layout.DrawOutline(self.newtab_rect, "black", 1))
+        cmds.append(draw_commands.DrawOutline(self.newtab_rect, "black", 1))
         cmds.append(
-            layout.DrawText(
+            draw_commands.DrawText(
                 self.newtab_rect.left + self.padding,
                 self.newtab_rect.top,
                 "+",
@@ -196,19 +197,19 @@ class Chrome:
         for i, tab in enumerate(self.browser.tabs):
             bounds = self.tab_rect(i)
             cmds.append(
-                layout.DrawLine(
-                    layout.Rect(bounds.left, 0, bounds.left, bounds.bottom), "black", 1
+                draw_commands.DrawLine(
+                    draw_commands.Rect(bounds.left, 0, bounds.left, bounds.bottom), "black", 1
                 )
             )
             cmds.append(
-                layout.DrawLine(
-                    layout.Rect(bounds.right, 0, bounds.right, bounds.bottom),
+                draw_commands.DrawLine(
+                    draw_commands.Rect(bounds.right, 0, bounds.right, bounds.bottom),
                     "black",
                     1,
                 )
             )
             cmds.append(
-                layout.DrawText(
+                draw_commands.DrawText(
                     bounds.left + self.padding,
                     bounds.top + self.padding,
                     "Tab {}".format(i),
@@ -219,15 +220,15 @@ class Chrome:
             )
             if tab == self.browser.active_tab:
                 cmds.append(
-                    layout.DrawLine(
-                        layout.Rect(0, bounds.bottom, bounds.left, bounds.bottom),
+                    draw_commands.DrawLine(
+                        draw_commands.Rect(0, bounds.bottom, bounds.left, bounds.bottom),
                         "black",
                         1,
                     )
                 )
                 cmds.append(
-                    layout.DrawLine(
-                        layout.Rect(bounds.right, bounds.bottom, WIDTH, bounds.bottom),
+                    draw_commands.DrawLine(
+                        draw_commands.Rect(bounds.right, bounds.bottom, WIDTH, bounds.bottom),
                         "black",
                         1,
                     )
@@ -238,9 +239,9 @@ class Chrome:
         if self.browser.active_tab.has_back_history():
             back_tags.append(POINTER_HOVER_TAG)
             back_color = "black"
-        cmds.append(layout.DrawOutline(self.back_rect, back_color, 1))
+        cmds.append(draw_commands.DrawOutline(self.back_rect, back_color, 1))
         cmds.append(
-            layout.DrawText(
+            draw_commands.DrawText(
                 self.back_rect.left + self.padding,
                 self.back_rect.top,
                 "<",
@@ -255,9 +256,9 @@ class Chrome:
         if self.browser.active_tab.has_forward_history():
             forward_tags.append(POINTER_HOVER_TAG)
             forward_color = "black"
-        cmds.append(layout.DrawOutline(self.forward_rect, forward_color, 1))
+        cmds.append(draw_commands.DrawOutline(self.forward_rect, forward_color, 1))
         cmds.append(
-            layout.DrawText(
+            draw_commands.DrawText(
                 self.forward_rect.left + self.padding,
                 self.forward_rect.top,
                 ">",
@@ -267,13 +268,13 @@ class Chrome:
             )
         )
         # draw home button
-        cmds.append(layout.DrawOutline(self.home_rect, "black", 1))
+        cmds.append(draw_commands.DrawOutline(self.home_rect, "black", 1))
         self.image = load_home_image()
         height = self.home_rect.bottom - self.home_rect.top
         extra_space = height - self.image.height()
         h_padding = round(extra_space / 2)
         cmds.append(
-            layout.DrawImage(
+            draw_commands.DrawImage(
                 self.home_rect.left + self.padding,
                 self.home_rect.top + h_padding,
                 self.image,
@@ -281,11 +282,11 @@ class Chrome:
             )
         )
         # draw address bar
-        cmds.append(layout.DrawOutline(self.address_rect, "black", 1))
+        cmds.append(draw_commands.DrawOutline(self.address_rect, "black", 1))
         url = str(self.browser.active_tab.url)
         if self.focus == Focusable.ADDRESS_BAR:
             cmds.append(
-                layout.DrawText(
+                draw_commands.DrawText(
                     self.address_rect.left + self.padding,
                     self.address_rect.top,
                     self.address_bar_value,
@@ -295,8 +296,8 @@ class Chrome:
             )
             w = self.font.measure(self.address_bar_value[: self.address_cursor_index])
             cmds.append(
-                layout.DrawLine(
-                    layout.Rect(
+                draw_commands.DrawLine(
+                    draw_commands.Rect(
                         self.address_rect.left + self.padding + w,
                         self.address_rect.top,
                         self.address_rect.left + self.padding + w,
@@ -308,7 +309,7 @@ class Chrome:
             )
         else:
             cmds.append(
-                layout.DrawText(
+                draw_commands.DrawText(
                     self.address_rect.left + self.padding,
                     self.address_rect.top,
                     url,
