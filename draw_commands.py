@@ -18,8 +18,10 @@ class DrawOutline:
     rect: Rect
     color: str
     thickness: int
+    tags: list[str] = field(kw_only=True, default_factory=list)
 
-    def execute(self, scroll, canvas):
+    def execute(self, scroll, canvas, tags=[]):
+        tags.extend(self.tags)
         canvas.create_rectangle(
             self.rect.left,
             self.rect.top - scroll,
@@ -27,6 +29,7 @@ class DrawOutline:
             self.rect.bottom - scroll,
             width=self.thickness,
             outline=self.color,
+            tags=tags,
         )
 
 
