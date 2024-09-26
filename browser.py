@@ -1,10 +1,13 @@
+import urllib.parse
 import draw_commands
 import layout
 import html_parser
 import time
 import tkinter
 import tkinter.font
+import typing
 import url
+import urllib
 from dataclasses import dataclass
 from display_constants import *
 from enum import Enum
@@ -32,8 +35,15 @@ INHERITED_PROPERTIES = {
 CLEARABLE_CONTENT_TAG = "clearable"
 
 
+class LoadAction(Enum):
+    NEW = "loading new url"
+    HISTORY = "loading history"
+    FORM = "submitting form"
+
+
 class Focusable(Enum):
     ADDRESS_BAR = "address bar"
+    CONTENT = "content"
 
 
 class Event(Enum):
@@ -117,6 +127,8 @@ class Chrome:
                 if self.tab_rect(i).containsPoint(x, y):
                     self.browser.active_tab = tab
                     break
+    def blur(self):
+        self.focus = None
 
     def keypress(self, char: str) -> bool:
         if self.focus == Focusable.ADDRESS_BAR:
@@ -363,8 +375,12 @@ class Browser:
     def click(self, e):
         # being called for clicks on home button / entry bar
         if e.y < self.chrome.bottom:
+            self.focus = None
+            self.active_tab.blur()
             self.chrome.click(e.x, e.y)
         else:
+            self.focus = Focusable.CONTENT 
+            self.chrome.blur()
             tab_y = e.y - self.chrome.bottom
             self.active_tab.click(e.x, tab_y)
         self.draw()
@@ -376,6 +392,8 @@ class Browser:
                 should_draw = self.chrome.enter()
             case Event.BACKSPACE:
                 should_draw = self.chrome.backspace()
+                if not should_draw and self.focus == Focusable.CONTENT:
+                    should_draw = self.active_tab.backspace()
             case Event.LEFT_ARROW | Event.RIGHT_ARROW:
                 should_draw = self.chrome.arrow_key(event)
             case Event.ESCAPE:
@@ -386,6 +404,8 @@ class Browser:
                 if not (0x20 <= ord(e.char) < 0x7F):
                     return
                 should_draw = self.chrome.keypress(e.char)
+                if not should_draw and self.focus == Focusable.CONTENT:
+                    should_draw = self.active_tab.keypress(e.char)
         if should_draw:
             self.draw()
 
@@ -429,6 +449,7 @@ class Tab:
         self.tab_height = tab_height
         self.scroll_offset = 0
         self.url = None
+        self.focus = None
         self.display_list = []
 
     def has_back_history(self) -> bool:
@@ -437,10 +458,13 @@ class Tab:
     def has_forward_history(self) -> bool:
         return len(self.forward_history) > 0
 
-    def load(self, input: str | url.URL, clear_forward_histpry=True):
+    def load(self, input: str | url.URL,
+             load_action: typing.Optional[LoadAction] = LoadAction.NEW,
+             payload: typing.Optional[str] = None):
         print("loading:", input)
-        self.backward_history.append(input)
-        if clear_forward_histpry:
+        if not load_action == LoadAction.FORM:
+            self.backward_history.append(input)
+        if load_action == LoadAction.NEW:
             self.forward_history = []
         self.scroll_offset = 0
         is_view_source = False
@@ -453,18 +477,20 @@ class Tab:
             self.url = url.URL(link)
         else:
             self.url = input
-        cache_response = self.request_from_cache(self.url)
+        skip_cache = load_action == LoadAction.FORM
+        cache_response = None if skip_cache else self.request_from_cache(self.url)
         if cache_response:
             body, cache_time = cache_response
         else:
-            body, cache_time = self.url.request()
-            self.cache_request(self.url, body, cache_time)
-        tree = (
+            body, cache_time = self.url.request(payload)
+            if not skip_cache:
+                self.cache_request(self.url, body, cache_time)
+        self.nodes = (
             layout.Text(None, body)
             if is_view_source
             else html_parser.HTMLParser(body).parse()
         )
-        nodes_list = tree_to_list(tree, [])
+        nodes_list = tree_to_list(self.nodes, [])
         links = [
             node.attributes["href"]
             for node in nodes_list
@@ -473,7 +499,7 @@ class Tab:
             and node.attributes.get("rel") == "stylesheet"
             and "href" in node.attributes
         ]
-        rules = DEFAULT_STYLE_SHEET.copy()
+        self.rules = DEFAULT_STYLE_SHEET.copy()
         for link in links:
             style_url = self.url.resolve(link)
             try:
@@ -487,16 +513,18 @@ class Tab:
                 continue
             new_rules = CSSParser(css).parse()
             # print(new_rules)
-            rules.extend(new_rules)
-        style(tree, sorted(rules, key=cascade_priority))
+            self.rules.extend(new_rules)
         titles = [
             node.children[0].text
             for node in nodes_list
             if isinstance(node, html_parser.Element) and node.tag == "title"
         ]
         self.title = titles[0] if len(titles) else ""
-
-        self.document = layout.DocumentLayout(tree)
+        self.render()
+    
+    def render(self):
+        style(self.nodes, sorted(self.rules, key=cascade_priority))
+        self.document = layout.DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
@@ -521,12 +549,12 @@ class Tab:
             current = self.backward_history.pop()
             self.forward_history.append(current)
             back = self.backward_history.pop()
-            self.load(back, False)
+            self.load(back, LoadAction.HISTORY)
 
     def go_forward(self):
         if len(self.forward_history) > 0:
             next = self.forward_history.pop()
-            self.load(next, False)
+            self.load(next, LoadAction.HISTORY)
 
     def draw(self, canvas, offset):
         for cmd in self.display_list:
@@ -555,6 +583,29 @@ class Tab:
     def scroll(self, offset):
         max_y = max(self.document.height + VSTEP - self.tab_height, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
+    
+    def blur(self):
+        if self.focus:
+            self.focus.is_focused = False 
+            self.focus = None
+            self.render()
+    
+    def keypress(self, char):
+        if self.focus and self.focus.tag == "input":
+            self.focus.attributes["value"] += char
+            self.render()
+            return True
+        return False
+    
+    def backspace(self):
+        if self.focus and self.focus.tag == "input":
+            orig_value = self.focus.attributes["value"]
+            # return if there is nothing to delete
+            if not orig_value: return False
+            self.focus.attributes["value"] = orig_value[:-1]
+            self.render()
+            return True
+        return False
 
     def click(self, x, y):
         # print("click ", x, y)
@@ -572,11 +623,10 @@ class Tab:
         elt = objs[-1].node
         # find the clickable element
         while elt:
-            if (
-                isinstance(elt, html_parser.Element)
-                and elt.tag == "a"
-                and "href" in elt.attributes
-            ):
+            if not isinstance(elt, html_parser.Element):
+                elt = elt.parent
+                continue
+            if elt.tag == "a" and "href" in elt.attributes:
                 href = elt.attributes["href"]
                 print("href", href)
                 # ignore fragment links
@@ -584,7 +634,36 @@ class Tab:
                     return self.scroll_to_fragment(href, layout_list)
                 url = self.url.resolve(href)
                 return self.load(url)
+            elif elt.tag == "input":
+                elt.attributes["value"] = ""
+                if self.focus:
+                    self.focus.is_focused = False
+                self.focus = elt
+                elt.is_focused = True
+                return self.render()
+            elif elt.tag == "button":
+                # travel up until you find a form
+                while elt:
+                    if isinstance(elt, html_parser.Element) \
+                        and elt.tag == "form" and "action" in elt.attributes:
+                        return self.submit_form(elt)
+                    elt = elt.parent
             elt = elt.parent
+
+    def submit_form(self, elt: html_parser.Element):
+        inputs = [node for node in tree_to_list(elt, [])
+                  if isinstance(node, html_parser.Element)
+                  and node.tag == "input"
+                  and "name" in node.attributes]
+        body = ""
+        for input in inputs:
+            name = urllib.parse.quote(input.attributes["name"])
+            value = urllib.parse.quote(input.attributes.get("value", ""))
+            body += f"&{name}={value}"
+        body = body[1:]
+        url = self.url.resolve(elt.attributes["action"])
+        self.load(url, LoadAction.FORM, body)
+
 
 
 def paint_tree(layout_object, display_list):

@@ -97,7 +97,7 @@ class TestUrl(unittest.TestCase):
         self.assertEqual(u.request(), (test_message, 0))
 
     @patch("socket.socket")
-    def test_http(self, mock_socket_ctr):
+    def test_http_get(self, mock_socket_ctr):
         mock_socket = get_mock_socket(mock_socket_ctr)
         request = f"GET /something HTTP/1.1\r\n"
         request += f"Host: google.com\r\n"
@@ -110,6 +110,22 @@ class TestUrl(unittest.TestCase):
         mock_socket.connect.assert_called_once_with(("google.com", 4229))
         mock_socket.send.assert_called_once_with(request.encode("utf8"))
         self.assertEqual(response, ("Body text", 0))
+
+    @patch("socket.socket")
+    def test_http_post(self, mock_socket_ctr):
+        body = "This body is a wonderland"
+        mock_socket = get_mock_socket(mock_socket_ctr)
+        request = f"POST /something HTTP/1.1\r\n"
+        request += f"Content-Length: {len(body.encode("utf-8"))}\r\n"
+        request += f"Host: google.com\r\n"
+        request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
+        request += body
+
+        test_url = "http://google.com:4229/something"
+        u = url.URL(test_url)
+        u.request(body)
+
+        mock_socket.send.assert_called_once_with(request.encode("utf8"))
 
     @patch("socket.socket")
     def test_http_no_port(self, mock_socket_ctr):

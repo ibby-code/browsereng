@@ -38,8 +38,10 @@ class DrawLine:
     rect: Rect
     color: str
     thickness: int
+    tags: list[str] = field(kw_only=True, default_factory=list)
 
-    def execute(self, scroll, canvas):
+    def execute(self, scroll, canvas, tags = []):
+        tags.extend(self.tags)
         canvas.create_line(
             self.rect.left,
             self.rect.top - scroll,
@@ -47,6 +49,7 @@ class DrawLine:
             self.rect.bottom - scroll,
             width=self.thickness,
             fill=self.color,
+            tags=tags,
         )
 
 

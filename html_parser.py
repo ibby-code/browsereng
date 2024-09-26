@@ -59,6 +59,7 @@ class Node:
 @dataclass()
 class Text(Node):
     text: str
+    is_focused = False
 
     def __repr__(self):
         return repr(self.text)
@@ -68,6 +69,7 @@ class Text(Node):
 class Element(Node):
     tag: str
     attributes: dict[str, str]
+    is_focused = False
 
     def __repr__(self):
         return f"<{self.tag}>"

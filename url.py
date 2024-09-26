@@ -75,16 +75,16 @@ class URL:
                 base += "/"
             return URL(base + url)
 
-    def request(self):
+    def request(self, payload=None):
         """Returns tuple with response and cache time"""
         if self.scheme in HTTP_SCHEMES:
-            return self.make_http_request()
+            return self.make_http_request(payload)
         elif self.scheme == "file":
             return self.make_file_request()
         elif self.scheme == "data":
             return self.make_data_request()
 
-    def make_http_request(self, redirect=0):
+    def make_http_request(self, payload=None, redirect=0):
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -96,11 +96,16 @@ class URL:
                 self.socket = ctx.wrap_socket(self.socket, server_hostname=self.host)
             # connect to url
             self.socket.connect((self.host, self.port))
-        # create GET request
-        request = f"GET {self.path} HTTP/1.1\r\n"
+        # create request
+        method = "POST" if payload else "GET"
+        request = f"{method} {self.path} HTTP/1.1\r\n"
+        if payload:
+            length = len(payload.encode("utf8"))
+            request += f"Content-Length: {length}\r\n"
         request += f"Host: {self.host}\r\n"
         request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
         # encode request as bytes to send
+        if payload: request += payload
         self.socket.send(request.encode("utf8"))
         # read all responses into var
         raw_response = self.socket.makefile("rb", encoding="utf8", newline="\r\n")

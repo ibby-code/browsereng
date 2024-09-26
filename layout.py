@@ -3,7 +3,7 @@ import re
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
 from display_constants import *
-from draw_commands import DrawRect, Rect, DrawText, DrawOutline
+from draw_commands import DrawRect, Rect, DrawText, DrawOutline, DrawLine
 
 
 PIXEL_VALUE_REGEX = r"(\d+)px"
@@ -337,7 +337,6 @@ class InputLayout:
         if bgcolor != "transparent":
             rect = Rect(self.x, self.y, self.x + self.width, self.y + self.height)
             cmds.append(DrawRect(rect, bgcolor))
-            # use outline in height and width calculations and conditionally add via css
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
         elif self.node.tag == "button":
@@ -347,7 +346,12 @@ class InputLayout:
             else:
                 print("Ignoring HTML contents inside button")
                 text = ""
+        # use outline in height and width calculations and conditionally add via css
         cmds.append(DrawOutline(rect, 'black', 1))
+        if self.node.is_focused and self.node.tag == "input":
+            cx = self.x + self.font.measure(text)
+            cmds.append(DrawLine(
+                Rect(cx, self.y, cx, self.y + self.height), "black", 1))
         color = self.node.style["color"]
         cmds.append(DrawText(self.x, self.y, text, self.font, color))
         return cmds
