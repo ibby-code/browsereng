@@ -108,7 +108,7 @@ class TestUrl(unittest.TestCase):
         response = u.request()
 
         mock_socket.connect.assert_called_once_with(("google.com", 4229))
-        mock_socket.send.assert_called_once_with(request.encode("utf8"))
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
         self.assertEqual(response, ("Body text", 0))
 
     @patch("socket.socket")
@@ -125,7 +125,7 @@ class TestUrl(unittest.TestCase):
         u = url.URL(test_url)
         u.request(body)
 
-        mock_socket.send.assert_called_once_with(request.encode("utf8"))
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
 
     @patch("socket.socket")
     def test_http_no_port(self, mock_socket_ctr):
@@ -217,7 +217,7 @@ class TestUrl(unittest.TestCase):
         response = u.request()
 
         mock_socket.send.assert_has_calls(
-            [call(request_one.encode("utf8")), call(request_two.encode("utf8"))]
+            [call(request_one.encode("utf-8")), call(request_two.encode("utf-8"))]
         )
         self.assertEqual(response, ("Body text", 0))
 

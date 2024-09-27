@@ -648,7 +648,8 @@ class Tab:
                         and elt.tag == "form" and "action" in elt.attributes:
                         return self.submit_form(elt)
                     elt = elt.parent
-            elt = elt.parent
+            if elt:
+                elt = elt.parent
 
     def submit_form(self, elt: html_parser.Element):
         inputs = [node for node in tree_to_list(elt, [])

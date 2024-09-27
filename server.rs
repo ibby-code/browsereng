@@ -8,14 +8,24 @@ use std::net::{TcpListener, TcpStream};
 const OK_RESPONSE: &str = "200 OK";
 const MISSING_RESPONSE: &str = "404 Not Found";
 
+#[derive(Debug)]
+enum ServerError {
+    UnsupportedMethod,
+    MalformedHeader,
+    Utf8ParseError,
+    WriteToStream,
+}
+
+type ServerResult = Result<usize, ServerError>;
+
 fn get_comments_html(entries: &Vec::<String>) ->  String {
     let mut out = String::new();
     out.push_str("<html><body>");
     for entry in entries {
         out.push_str(&format!("<p>{}</p>", entry));
     }
-    out.push_str("<form action=add method=post> \
-                    <p><input name=guest></p> \
+    out.push_str("<form action=\"add\" method=\"post\"> \
+                    <p><input name=\"guest\"></p> \
                     <p><button>Sign the book!</button></p> \
                     </form");
     out.push_str("</body></html>");
@@ -26,6 +36,7 @@ fn get_not_found_html(method: &str, url: &str) -> String {
     let mut out = String::new();
     out.push_str("<html><body>");
     out.push_str(&format!("<h1>{} {} not found!</h1>", method, url));
+    out.push_str("</body></html>");
     out
 }
 
@@ -61,19 +72,43 @@ fn do_request(entries: &mut Vec::<String>, method: &str, url: &str, _headers: Ha
     response
 } 
 
-fn handle_client(mut stream: TcpStream, entries: &mut Vec::<String>) -> std::io::Result<()> {
+fn get_server_error_response(err: &ServerError) -> String {
+    let body = format!(
+        "<html><body><p>Server error!</p><p>Details: {:?}</p></body></html>",
+        err);
+    let mut response = String::from("HTTP/1.0 500\r\n");
+    response.push_str(&format!("Content-Length: {body_length}\r\n\r\n", body_length=body.len()));
+    response.push_str(&body);
+    response
+}
+
+fn handle_client(mut stream: TcpStream, entries: &mut Vec::<String>) -> ServerResult {
     let mut reader = BufReader::new(&stream);
 
     let mut line = String::new();
-    reader.read_line(&mut line).expect("Fail to read lines");
+    match reader.read_line(&mut line) {
+        Ok(_) => (),
+        Err(e) => {
+            println!("First line error: {e:?}");
+            return Err(ServerError::Utf8ParseError);
+        }
+    }
     let v: Vec<&str> = line.as_str().splitn(3, " ").collect();
     if let [method, url, _version] = v[..] {
-        assert!(["GET", "POST"].contains(&method), "Cannot support {} requests", method);
+        if !["GET", "POST"].contains(&method) {
+            return Err(ServerError::UnsupportedMethod);
+        }
         let mut header_map = HashMap::new();
         let mut line = String::new();
         loop {
             line.clear();
-            reader.read_line(&mut line).expect("Fail to read lines");
+            match reader.read_line(&mut line) {
+                Ok(_) => (),
+                Err(why) => {
+                    println!("Error: {}", why);
+                    continue;
+                }
+            }
             if line == "\r\n" {
                 break;
             }
@@ -107,12 +142,14 @@ fn handle_client(mut stream: TcpStream, entries: &mut Vec::<String>) -> std::io:
         response.push_str(&format!("Content-Length: {body_length}\r\n\r\n", body_length=body.len()));
         response.push_str(&body);
         println!("Writing response: {response}");
-        stream.write(&response.as_bytes())?;
+        return match stream.write(&response.as_bytes()) {
+            Ok(bytes) => Ok(bytes),
+            Err(_) => Err(ServerError::WriteToStream)
+        };
     } else {
         println!("Malformed header: {v:?}");
-    }
-    Ok(())
-    
+        return Err(ServerError::MalformedHeader);
+    };
 }
 
 fn main() -> std::io::Result<()> {
@@ -122,8 +159,8 @@ fn main() -> std::io::Result<()> {
 
     for stream in listener.incoming() {
         match handle_client(stream?, &mut entries) {
-            Ok(_) => println!("Client handled"),
-            Err(e) => println!("Client exception: {e}"),
+            Ok(bytes) => println!("Client handled, set {} bytes", bytes),
+            Err(why) => println!("Server exception: {why:?}"),
         }
     }
     Ok(())

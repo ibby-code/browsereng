@@ -100,15 +100,15 @@ class URL:
         method = "POST" if payload else "GET"
         request = f"{method} {self.path} HTTP/1.1\r\n"
         if payload:
-            length = len(payload.encode("utf8"))
+            length = len(payload.encode("utf-8"))
             request += f"Content-Length: {length}\r\n"
         request += f"Host: {self.host}\r\n"
         request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
         # encode request as bytes to send
         if payload: request += payload
-        self.socket.send(request.encode("utf8"))
+        self.socket.send(request.encode("utf-8"))
         # read all responses into var
-        raw_response = self.socket.makefile("rb", encoding="utf8", newline="\r\n")
+        raw_response = self.socket.makefile("rb", encoding="utf-8", newline="\r\n")
 
         statusline = raw_response.readline().decode(encoding="utf-8")
         version, status, explanation = statusline.split(" ", 2)
