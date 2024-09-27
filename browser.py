@@ -390,6 +390,8 @@ class Browser:
         match event:
             case Event.ENTER:
                 should_draw = self.chrome.enter()
+                if not should_draw and self.focus == Focusable.CONTENT:
+                    should_draw = self.active_tab.enter()
             case Event.BACKSPACE:
                 should_draw = self.chrome.backspace()
                 if not should_draw and self.focus == Focusable.CONTENT:
@@ -606,6 +608,15 @@ class Tab:
             self.render()
             return True
         return False
+    
+    # why does this not re-render correctly when click does
+    def enter(self):
+        if self.focus and self.focus.tag == "input":
+            elt = self.try_submit_form_parent(self.focus)
+            if elt:
+                self.render()
+                return True
+        return False
 
     def click(self, x, y):
         # print("click ", x, y)
@@ -642,14 +653,18 @@ class Tab:
                 elt.is_focused = True
                 return self.render()
             elif elt.tag == "button":
-                # travel up until you find a form
-                while elt:
-                    if isinstance(elt, html_parser.Element) \
-                        and elt.tag == "form" and "action" in elt.attributes:
-                        return self.submit_form(elt)
-                    elt = elt.parent
+                elt = self.try_submit_form_parent(elt)
             if elt:
                 elt = elt.parent
+
+    def try_submit_form_parent(self, elt: html_parser.Element) -> html_parser.Element|None:
+        # travel up until you find a form
+        while elt:
+            if isinstance(elt, html_parser.Element) \
+                and elt.tag == "form" and "action" in elt.attributes:
+                return self.submit_form(elt)
+            elt = elt.parent
+        return elt
 
     def submit_form(self, elt: html_parser.Element):
         inputs = [node for node in tree_to_list(elt, [])
@@ -664,6 +679,7 @@ class Tab:
         body = body[1:]
         url = self.url.resolve(elt.attributes["action"])
         self.load(url, LoadAction.FORM, body)
+        return elt
 
 
 
