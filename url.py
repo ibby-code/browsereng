@@ -146,11 +146,26 @@ class URL:
             return (f"Redirect loop detected! Last redirect is to :{location}", 0)
 
         # fail unsupported headers
-        assert "transfer-encoding" not in response_headers
         assert "content-encoding" not in response_headers
+        assert response_headers["transfer-encoding"] == "chunked" if "transfer-encoding" in response_headers else True
 
         # respect content-length
-        if "content-length" in response_headers:
+        if "transfer-encoding" in response_headers:
+            content = ""
+            content_type = response_headers.get("content-type", "").split(";")
+            charset = "utf-8"
+            if len(content_type) == 2:
+                charset_vals = content_type[1].split("=")
+                if len(charset_vals) == 2 and charset_vals[0].strip() == "charset":
+                    charset = charset_vals[1]
+            while True:
+                chunk_size = int(raw_response.readline().split(b";", 1)[0].strip(), 16)
+                # ignoring footer data
+                if not chunk_size: break
+                content += raw_response.read(chunk_size).decode(charset)
+                raw_response.readline()
+
+        elif "content-length" in response_headers:
             content_length = int(response_headers["content-length"])
             content = raw_response.read(content_length).decode("utf-8")
         else:
