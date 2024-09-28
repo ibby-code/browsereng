@@ -2,6 +2,7 @@ import urllib.parse
 import draw_commands
 import layout
 import html_parser
+import js_context
 import time
 import tkinter
 import tkinter.font
@@ -459,6 +460,53 @@ class Tab:
 
     def has_forward_history(self) -> bool:
         return len(self.forward_history) > 0
+    
+    def load_stylesheets(self, nodes_list: list[html_parser.Node]):
+        links = [
+            node.attributes["href"]
+            for node in nodes_list
+            if isinstance(node, html_parser.Element)
+            and node.tag == "link"
+            and node.attributes.get("rel") == "stylesheet"
+            and "href" in node.attributes
+        ]
+        rules = DEFAULT_STYLE_SHEET.copy()
+        for link in links:
+            style_url = self.url.resolve(link)
+            try:
+                cached_response = self.request_from_cache(style_url)
+                if cached_response:
+                    css, cache_time = cached_response
+                else:
+                    css, cache_time = style_url.request()
+                self.cache_request(style_url, css, cache_time)
+            except:
+                continue
+            new_rules = CSSParser(css).parse()
+            # print(new_rules)
+            rules.extend(new_rules)
+        return rules
+
+    
+    def load_javascript(self, nodes_list: list[html_parser.Node]):
+        scripts = [node.attributes["src"] for node
+                   in nodes_list 
+                   if isinstance(node, html_parser.Element)
+                   and node.tag == "script"
+                   and "src" in node.attributes]
+        self.js = js_context.JSContext(self)
+        for script in scripts:
+            script_url = self.url.resolve(script)
+            try:
+                cached_response = self.request_from_cache(script_url)
+                if cached_response:
+                    js, cache_time = cached_response
+                else:
+                    js, cache_time = script_url.request()
+                self.cache_request(script_url, js, cache_time)
+            except:
+                continue
+            self.js.run(script, js)
 
     def load(self, input: str | url.URL,
              load_action: typing.Optional[LoadAction] = LoadAction.NEW,
@@ -493,29 +541,8 @@ class Tab:
             else html_parser.HTMLParser(body).parse()
         )
         nodes_list = tree_to_list(self.nodes, [])
-        links = [
-            node.attributes["href"]
-            for node in nodes_list
-            if isinstance(node, html_parser.Element)
-            and node.tag == "link"
-            and node.attributes.get("rel") == "stylesheet"
-            and "href" in node.attributes
-        ]
-        self.rules = DEFAULT_STYLE_SHEET.copy()
-        for link in links:
-            style_url = self.url.resolve(link)
-            try:
-                cached_response = self.request_from_cache(style_url)
-                if cached_response:
-                    css, cache_time = cached_response
-                else:
-                    css, cache_time = style_url.request()
-                self.cache_request(style_url, css, cache_time)
-            except:
-                continue
-            new_rules = CSSParser(css).parse()
-            # print(new_rules)
-            self.rules.extend(new_rules)
+        self.rules = self.load_stylesheets(nodes_list) 
+        self.load_javascript(nodes_list)
         titles = [
             node.children[0].text
             for node in nodes_list

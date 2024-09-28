@@ -332,11 +332,15 @@ class InputLayout:
 
     def paint(self):
         cmds = []
+        tags = []
+        cursor_style = self.node.style.get("cursor", None)
+        if cursor_style and cursor_style == "pointer":
+            tags.append(POINTER_HOVER_TAG)
         bgcolor = self.node.style.get("background-color",
                                       "transparent")
         if bgcolor != "transparent":
             rect = Rect(self.x, self.y, self.x + self.width, self.y + self.height)
-            cmds.append(DrawRect(rect, bgcolor))
+            cmds.append(DrawRect(rect, bgcolor, tags=tags))
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
         elif self.node.tag == "button":
@@ -346,14 +350,15 @@ class InputLayout:
             else:
                 print("Ignoring HTML contents inside button")
                 text = ""
+
         # use outline in height and width calculations and conditionally add via css
-        cmds.append(DrawOutline(rect, 'black', 1))
+        cmds.append(DrawOutline(rect, 'black', 1, tags=tags))
         if self.node.is_focused and self.node.tag == "input":
             cx = self.x + self.font.measure(text)
             cmds.append(DrawLine(
-                Rect(cx, self.y, cx, self.y + self.height), "black", 1))
+                Rect(cx, self.y, cx, self.y + self.height), "black", 1, tags=tags))
         color = self.node.style["color"]
-        cmds.append(DrawText(self.x, self.y, text, self.font, color))
+        cmds.append(DrawText(self.x, self.y, text, self.font, color, tags=tags))
         return cmds
 
     def layout(self):

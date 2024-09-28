@@ -55,7 +55,6 @@ class Node:
     style: dict[str, str] = field(kw_only=True, default_factory=dict)
     parent: "Node"
 
-
 @dataclass()
 class Text(Node):
     text: str
@@ -73,6 +72,14 @@ class Element(Node):
 
     def __repr__(self):
         return f"<{self.tag}>"
+
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return id(self) == id(other) 
+        return NotImplemented
+
+    def __hash__(self):
+        return hash((id(self)))
 
 
 def create_anon_block(parent: Node, style: dict[str, str], children: list[Node]):
