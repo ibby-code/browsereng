@@ -7,10 +7,10 @@ from html_parser import Node, HTMLParser
 RUNTIME_JS_FILE = "runtime.js"
 RUNTIME_JS = open(RUNTIME_JS_FILE).read()
 
-EVENT_DISPATCH_JS = \
-    "new Node(dukpy.handle).dispatchEvent(dukpy.type)"
+EVENT_DISPATCH_JS = "new Node(dukpy.handle).dispatchEvent(dukpy.type)"
 
-class JSEvent(Enum): 
+
+class JSEvent(Enum):
     CLICK = "click"
     KEYDOWN = "keydown"
     SUBMIT = "submit"
@@ -33,8 +33,8 @@ class JSContext:
             return self.interp.evaljs(code)
         except dukpy.JSRuntimeError as e:
             print("Script", script, "crashed", e)
-        
-    def dispatch_event(self, type: JSEvent, elt: Node): 
+
+    def dispatch_event(self, type: JSEvent, elt: Node):
         handle = self.node_to_handle.get(elt, -1)
         self.interp.evaljs(EVENT_DISPATCH_JS, type=type.value, handle=handle)
 
@@ -57,10 +57,10 @@ class JSContext:
         elt = self.handle_to_node[handle]
         attr = elt.attributes.get(attr, None)
         return attr if attr else ""
-    
+
     def innerHTML_set(self, handle: int, s: str):
         doc = HTMLParser(f"<html><body>{s}</body></html>").parse()
-        new_nodes = doc.children[0].children 
+        new_nodes = doc.children[0].children
         elt = self.handle_to_node[handle]
         elt.children = new_nodes
         for child in elt.children:

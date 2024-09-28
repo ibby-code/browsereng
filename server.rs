@@ -22,16 +22,18 @@ enum ServerError {
 
 type ServerResult = Result<usize, ServerError>;
 
-fn get_comments_html(entries: &Vec::<String>) ->  String {
+fn get_comments_html(entries: &Vec<String>) -> String {
     let mut out = String::new();
     out.push_str("<html><body>");
     for entry in entries {
         out.push_str(&format!("<p>{}</p>", entry));
     }
-    out.push_str("<form action=\"add\" method=\"post\"> \
+    out.push_str(
+        "<form action=\"add\" method=\"post\"> \
                     <p><input name=\"guest\"></p> \
                     <p><button>Sign the book!</button></p> \
-                    </form");
+                    </form",
+    );
     out.push_str("<strong></strong>");
     out.push_str("<script src=\"/comment.js\"</script>");
     out.push_str("</body></html>");
@@ -59,52 +61,71 @@ fn decode_form(body: String) -> HashMap<String, String> {
     params
 }
 
-fn do_request(entries: &mut Vec::<String>, method: &str, url: &str, _headers: HashMap<String, String>, body: String ) -> (&'static str, String) {
-    let response =
-        if method == "GET" && url == "/" {
-            (OK_RESPONSE, get_comments_html(entries)) 
-        } else if method == "GET" && url == "/comment.js" {
-            let comment_path = Path::new("comment.js");
-            let mut comment_contents = String::new();
-            let mut comment_file = match File::open(&comment_path) {
-                Ok(file) => file,
-                Err(_) => return (SERVER_ERROR_RESPONSE, get_server_error_body(ServerError::ServeJsError)),
-            };
-            match comment_file.read_to_string(&mut comment_contents) {
-                Ok(_) => (),
-                Err(_) => return (SERVER_ERROR_RESPONSE, get_server_error_body(ServerError::ServeJsError))
+fn do_request(
+    entries: &mut Vec<String>,
+    method: &str,
+    url: &str,
+    _headers: HashMap<String, String>,
+    body: String,
+) -> (&'static str, String) {
+    let response = if method == "GET" && url == "/" {
+        (OK_RESPONSE, get_comments_html(entries))
+    } else if method == "GET" && url == "/comment.js" {
+        let comment_path = Path::new("comment.js");
+        let mut comment_contents = String::new();
+        let mut comment_file = match File::open(&comment_path) {
+            Ok(file) => file,
+            Err(_) => {
+                return (
+                    SERVER_ERROR_RESPONSE,
+                    get_server_error_body(ServerError::ServeJsError),
+                )
             }
-            return (OK_RESPONSE, comment_contents);
-        } else if method == "POST" && url == "/add" {
-            let params = decode_form(body);
-            match params.get("guest") {
-                Some(guest) => {
-                    entries.push(guest.clone());
-                },
-                _ => println!("Missing guest value")
-            }
-            (OK_RESPONSE, get_comments_html(entries))
-        } else {
-            (MISSING_RESPONSE, get_not_found_html(method, url))
         };
+        match comment_file.read_to_string(&mut comment_contents) {
+            Ok(_) => (),
+            Err(_) => {
+                return (
+                    SERVER_ERROR_RESPONSE,
+                    get_server_error_body(ServerError::ServeJsError),
+                )
+            }
+        }
+        return (OK_RESPONSE, comment_contents);
+    } else if method == "POST" && url == "/add" {
+        let params = decode_form(body);
+        match params.get("guest") {
+            Some(guest) => {
+                entries.push(guest.clone());
+            }
+            _ => println!("Missing guest value"),
+        }
+        (OK_RESPONSE, get_comments_html(entries))
+    } else {
+        (MISSING_RESPONSE, get_not_found_html(method, url))
+    };
     response
-} 
+}
 
 fn get_server_error_body(err: ServerError) -> String {
     format!(
         "<html><body><p>Server error!</p><p>Details: {:?}</p></body></html>",
-        err)
+        err
+    )
 }
 
 fn get_server_error_response(err: ServerError) -> String {
     let body = get_server_error_body(err);
     let mut response = String::from("HTTP/1.0 500\r\n");
-    response.push_str(&format!("Content-Length: {body_length}\r\n\r\n", body_length=body.len()));
+    response.push_str(&format!(
+        "Content-Length: {body_length}\r\n\r\n",
+        body_length = body.len()
+    ));
     response.push_str(&body);
     response
 }
 
-fn handle_client(mut stream: TcpStream, entries: &mut Vec::<String>) -> ServerResult {
+fn handle_client(mut stream: TcpStream, entries: &mut Vec<String>) -> ServerResult {
     let mut reader = BufReader::new(&stream);
 
     let mut line = String::new();
@@ -151,30 +172,35 @@ fn handle_client(mut stream: TcpStream, entries: &mut Vec::<String>) -> ServerRe
     let mut body = String::new();
     let content_length_str = match header_map.get("content-length") {
         Some(c) => c,
-        _ => "0"
+        _ => "0",
     };
     let content_length = match content_length_str.parse::<usize>() {
         Ok(val) => val,
         Err(why) => {
             println!("Could not parse content length: {why}");
             0
-        } 
+        }
     };
     if content_length != 0 {
         let mut body_buf = vec![0; content_length];
-        reader.read_exact(&mut body_buf).expect("Error reading from buffer");
+        reader
+            .read_exact(&mut body_buf)
+            .expect("Error reading from buffer");
         body = String::from_utf8(body_buf).expect("Body must be valid utf8");
     }
-   
+
     println!("recieved body {body}");
     let (status, body) = do_request(entries, method, url, header_map, body);
-    let mut response = String::from(format!("HTTP/1.0 {status}\r\n", status=status));
-    response.push_str(&format!("Content-Length: {body_length}\r\n\r\n", body_length=body.len()));
+    let mut response = String::from(format!("HTTP/1.0 {status}\r\n", status = status));
+    response.push_str(&format!(
+        "Content-Length: {body_length}\r\n\r\n",
+        body_length = body.len()
+    ));
     response.push_str(&body);
     println!("Writing response: {response}");
     return match stream.write(&response.as_bytes()) {
         Ok(bytes) => Ok(bytes),
-        Err(_) => Err(ServerError::WriteToStream)
+        Err(_) => Err(ServerError::WriteToStream),
     };
 }
 

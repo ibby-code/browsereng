@@ -128,6 +128,7 @@ class Chrome:
                 if self.tab_rect(i).containsPoint(x, y):
                     self.browser.active_tab = tab
                     break
+
     def blur(self):
         self.focus = None
 
@@ -190,9 +191,15 @@ class Chrome:
     def paint(self):
         cmds = []
         # add background for chrome
-        cmds.append(draw_commands.DrawRect(draw_commands.Rect(0, 0, WIDTH, self.bottom), "white"))
         cmds.append(
-            draw_commands.DrawLine(draw_commands.Rect(0, self.bottom, WIDTH, self.bottom), "black", 1)
+            draw_commands.DrawRect(
+                draw_commands.Rect(0, 0, WIDTH, self.bottom), "white"
+            )
+        )
+        cmds.append(
+            draw_commands.DrawLine(
+                draw_commands.Rect(0, self.bottom, WIDTH, self.bottom), "black", 1
+            )
         )
         # add new tab button
         cmds.append(draw_commands.DrawOutline(self.newtab_rect, "black", 1))
@@ -211,7 +218,9 @@ class Chrome:
             bounds = self.tab_rect(i)
             cmds.append(
                 draw_commands.DrawLine(
-                    draw_commands.Rect(bounds.left, 0, bounds.left, bounds.bottom), "black", 1
+                    draw_commands.Rect(bounds.left, 0, bounds.left, bounds.bottom),
+                    "black",
+                    1,
                 )
             )
             cmds.append(
@@ -234,14 +243,18 @@ class Chrome:
             if tab == self.browser.active_tab:
                 cmds.append(
                     draw_commands.DrawLine(
-                        draw_commands.Rect(0, bounds.bottom, bounds.left, bounds.bottom),
+                        draw_commands.Rect(
+                            0, bounds.bottom, bounds.left, bounds.bottom
+                        ),
                         "black",
                         1,
                     )
                 )
                 cmds.append(
                     draw_commands.DrawLine(
-                        draw_commands.Rect(bounds.right, bounds.bottom, WIDTH, bounds.bottom),
+                        draw_commands.Rect(
+                            bounds.right, bounds.bottom, WIDTH, bounds.bottom
+                        ),
                         "black",
                         1,
                     )
@@ -380,7 +393,7 @@ class Browser:
             self.active_tab.blur()
             self.chrome.click(e.x, e.y)
         else:
-            self.focus = Focusable.CONTENT 
+            self.focus = Focusable.CONTENT
             self.chrome.blur()
             tab_y = e.y - self.chrome.bottom
             self.active_tab.click(e.x, tab_y)
@@ -460,7 +473,7 @@ class Tab:
 
     def has_forward_history(self) -> bool:
         return len(self.forward_history) > 0
-    
+
     def load_stylesheets(self, nodes_list: list[html_parser.Node]):
         links = [
             node.attributes["href"]
@@ -487,13 +500,14 @@ class Tab:
             rules.extend(new_rules)
         return rules
 
-    
     def load_javascript(self, nodes_list: list[html_parser.Node]):
-        scripts = [node.attributes["src"] for node
-                   in nodes_list 
-                   if isinstance(node, html_parser.Element)
-                   and node.tag == "script"
-                   and "src" in node.attributes]
+        scripts = [
+            node.attributes["src"]
+            for node in nodes_list
+            if isinstance(node, html_parser.Element)
+            and node.tag == "script"
+            and "src" in node.attributes
+        ]
         self.js = js_context.JSContext(self)
         for script in scripts:
             script_url = self.url.resolve(script)
@@ -508,9 +522,12 @@ class Tab:
                 continue
             self.js.run(script, js)
 
-    def load(self, input: str | url.URL,
-             load_action: typing.Optional[LoadAction] = LoadAction.NEW,
-             payload: typing.Optional[str] = None):
+    def load(
+        self,
+        input: str | url.URL,
+        load_action: typing.Optional[LoadAction] = LoadAction.NEW,
+        payload: typing.Optional[str] = None,
+    ):
         print("loading:", input)
         if not load_action == LoadAction.FORM:
             self.backward_history.append(input)
@@ -541,7 +558,7 @@ class Tab:
             else html_parser.HTMLParser(body).parse()
         )
         nodes_list = tree_to_list(self.nodes, [])
-        self.rules = self.load_stylesheets(nodes_list) 
+        self.rules = self.load_stylesheets(nodes_list)
         self.load_javascript(nodes_list)
         titles = [
             node.children[0].text
@@ -550,7 +567,7 @@ class Tab:
         ]
         self.title = titles[0] if len(titles) else ""
         self.render()
-    
+
     def render(self):
         style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = layout.DocumentLayout(self.nodes)
@@ -598,7 +615,7 @@ class Tab:
     def scroll_to_fragment(self, fragment: str, layout_list):
         print(f"scrolling to {fragment}")
         layout_y = [
-            l.y 
+            l.y
             for l in layout_list
             if isinstance(l.node, layout.Element)
             and l.node.attributes.get("id", "") == fragment[1:]
@@ -612,13 +629,13 @@ class Tab:
     def scroll(self, offset):
         max_y = max(self.document.height + VSTEP - self.tab_height, 0)
         self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
-    
+
     def blur(self):
         if self.focus:
-            self.focus.is_focused = False 
+            self.focus.is_focused = False
             self.focus = None
             self.render()
-    
+
     def keypress(self, char):
         if self.focus:
             self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
@@ -627,19 +644,20 @@ class Tab:
                 self.render()
                 return True
         return False
-    
+
     def backspace(self):
         if self.focus:
             self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
             if self.focus.tag == "input":
                 orig_value = self.focus.attributes["value"]
                 # return if there is nothing to delete
-                if not orig_value: return False
+                if not orig_value:
+                    return False
                 self.focus.attributes["value"] = orig_value[:-1]
                 self.render()
                 return True
         return False
-    
+
     def enter(self):
         if self.focus:
             self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
@@ -692,21 +710,29 @@ class Tab:
             if elt:
                 elt = elt.parent
 
-    def try_submit_form_parent(self, elt: html_parser.Element) -> html_parser.Element|None:
+    def try_submit_form_parent(
+        self, elt: html_parser.Element
+    ) -> html_parser.Element | None:
         # travel up until you find a form
         while elt:
-            if isinstance(elt, html_parser.Element) \
-                and elt.tag == "form" and "action" in elt.attributes:
+            if (
+                isinstance(elt, html_parser.Element)
+                and elt.tag == "form"
+                and "action" in elt.attributes
+            ):
                 return self.submit_form(elt)
             elt = elt.parent
         return elt
 
     def submit_form(self, elt: html_parser.Element):
         self.js.dispatch_event(js_context.JSEvent.SUBMIT, elt)
-        inputs = [node for node in tree_to_list(elt, [])
-                  if isinstance(node, html_parser.Element)
-                  and node.tag == "input"
-                  and "name" in node.attributes]
+        inputs = [
+            node
+            for node in tree_to_list(elt, [])
+            if isinstance(node, html_parser.Element)
+            and node.tag == "input"
+            and "name" in node.attributes
+        ]
         body = ""
         for input in inputs:
             name = urllib.parse.quote(input.attributes["name"])
@@ -716,7 +742,6 @@ class Tab:
         url = self.url.resolve(elt.attributes["action"])
         self.load(url, LoadAction.FORM, body)
         return elt
-
 
 
 def paint_tree(layout_object, display_list):

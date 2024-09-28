@@ -55,6 +55,7 @@ class Node:
     style: dict[str, str] = field(kw_only=True, default_factory=dict)
     parent: "Node"
 
+
 @dataclass()
 class Text(Node):
     text: str
@@ -75,7 +76,7 @@ class Element(Node):
 
     def __eq__(self, other):
         if isinstance(other, Node):
-            return id(self) == id(other) 
+            return id(self) == id(other)
         return NotImplemented
 
     def __hash__(self):
