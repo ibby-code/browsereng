@@ -2,7 +2,7 @@ import browser
 import dukpy
 from css_parser import CSSParser, SelectorParsingException
 from enum import Enum
-from html_parser import Node
+from html_parser import Node, HTMLParser
 
 RUNTIME_JS_FILE = "runtime.js"
 RUNTIME_JS = open(RUNTIME_JS_FILE).read()
@@ -25,6 +25,7 @@ class JSContext:
         self.interp.export_function("log", print)
         self.interp.export_function("querySelectorAll", self.query_selector_all)
         self.interp.export_function("getAttribute", self.get_attribute)
+        self.interp.export_function("innerHTML_set", self.innerHTML_set)
         self.run(RUNTIME_JS_FILE, RUNTIME_JS)
 
     def run(self, script: str, code: str):
@@ -56,6 +57,15 @@ class JSContext:
         elt = self.handle_to_node[handle]
         attr = elt.attributes.get(attr, None)
         return attr if attr else ""
+    
+    def innerHTML_set(self, handle: int, s: str):
+        doc = HTMLParser(f"<html><body>{s}</body></html>").parse()
+        new_nodes = doc.children[0].children 
+        elt = self.handle_to_node[handle]
+        elt.children = new_nodes
+        for child in elt.children:
+            child.parent = elt
+        self.tab.render()
 
     def get_handle(self, elt: Node) -> int:
         if elt not in self.node_to_handle:

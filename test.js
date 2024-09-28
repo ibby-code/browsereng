@@ -5,10 +5,10 @@ console.log(true);
 console.log(5);
 console.log([2, "bye", {"1": 2}, [9, 3]]);
 
+var targetEl = document.querySelectorAll(".target")[0];
 function handleKeyDown() {
-  var name = this.getAttribute("name");
   var value = this.getAttribute("value");
-  console.log(name, value);
+  targetEl.innerHTML = "<b>" + value + "</b";
 }
 
 var inputs = document.querySelectorAll("input");

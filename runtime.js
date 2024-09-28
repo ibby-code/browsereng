@@ -50,6 +50,12 @@ function Node(handle) {
     this.handle = handle;
 }
 
+Object.defineProperty(Node.prototype, 'innerHTML', {
+    set: function(s) {
+        call_python("innerHTML_set", this.handle, s.toString());
+    }
+})
+
 Node.prototype.getAttribute = function(attr) {
     return call_python("getAttribute", this.handle, attr);
 }
