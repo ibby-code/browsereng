@@ -24,7 +24,7 @@ class JSContext:
         except dukpy.JSRuntimeError as e:
             print("Script", script, "crashed", e)
 
-    def query_selector_all(self, selector_text: str | None):
+    def query_selector_all(self, selector_text: str | None) -> list[int]:
         if not selector_text:
             return []
         try:

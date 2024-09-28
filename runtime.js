@@ -1,17 +1,35 @@
+function getLogValue(x) {
+    var x_type = typeof x;
+    var output = ""
+    switch (x_type) {
+        case "boolean":
+        case "number":
+            output = x;
+            break
+        case "string":
+            output = "\"" + x  + "\"";
+            break
+        default:
+            if (Array.isArray(x)) {
+                output += "[";
+                for (var i = 0; i < x.length; i++) {
+                    output += " " + getLogValue(x[i]) + ",";
+                }
+                if (x.length) {
+                    output = output.slice(0, -1); 
+                }
+                output += "]";
+            } else {
+                output = "[Object object]";
+            }
+            break;
+    }
+    return output;
+}
+
 console = {
     log: function(x) {
-        var x_type = typeof x;
-        var output = ""
-        switch (x_type) {
-            case "boolean":
-            case "number":
-            case "string":
-                output = x;
-                break
-            default:
-                output = "[Object object]";
-                break;
-        }
+        const output = getLogValue(x);
         call_python("log", output);
     }
 };
