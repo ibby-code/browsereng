@@ -620,29 +620,34 @@ class Tab:
             self.render()
     
     def keypress(self, char):
-        if self.focus and self.focus.tag == "input":
-            self.focus.attributes["value"] += char
-            self.render()
-            return True
+        if self.focus:
+            self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
+            if self.focus.tag == "input":
+                self.focus.attributes["value"] += char
+                self.render()
+                return True
         return False
     
     def backspace(self):
-        if self.focus and self.focus.tag == "input":
-            orig_value = self.focus.attributes["value"]
-            # return if there is nothing to delete
-            if not orig_value: return False
-            self.focus.attributes["value"] = orig_value[:-1]
-            self.render()
-            return True
-        return False
-    
-    # why does this not re-render correctly when click does
-    def enter(self):
-        if self.focus and self.focus.tag == "input":
-            elt = self.try_submit_form_parent(self.focus)
-            if elt:
+        if self.focus:
+            self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
+            if self.focus.tag == "input":
+                orig_value = self.focus.attributes["value"]
+                # return if there is nothing to delete
+                if not orig_value: return False
+                self.focus.attributes["value"] = orig_value[:-1]
                 self.render()
                 return True
+        return False
+    
+    def enter(self):
+        if self.focus:
+            self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
+            if self.focus.tag == "input":
+                elt = self.try_submit_form_parent(self.focus)
+                if elt:
+                    self.render()
+                    return True
         return False
 
     def click(self, x, y):
@@ -665,6 +670,7 @@ class Tab:
                 elt = elt.parent
                 continue
             if elt.tag == "a" and "href" in elt.attributes:
+                self.js.dispatch_event(js_context.JSEvent.CLICK, elt)
                 href = elt.attributes["href"]
                 print("href", href)
                 # ignore fragment links
@@ -673,6 +679,7 @@ class Tab:
                 url = self.url.resolve(href)
                 return self.load(url)
             elif elt.tag == "input":
+                self.js.dispatch_event(js_context.JSEvent.CLICK, elt)
                 elt.attributes["value"] = ""
                 if self.focus:
                     self.focus.is_focused = False
@@ -680,6 +687,7 @@ class Tab:
                 elt.is_focused = True
                 return self.render()
             elif elt.tag == "button":
+                self.js.dispatch_event(js_context.JSEvent.CLICK, elt)
                 elt = self.try_submit_form_parent(elt)
             if elt:
                 elt = elt.parent
@@ -694,6 +702,7 @@ class Tab:
         return elt
 
     def submit_form(self, elt: html_parser.Element):
+        self.js.dispatch_event(js_context.JSEvent.SUBMIT, elt)
         inputs = [node for node in tree_to_list(elt, [])
                   if isinstance(node, html_parser.Element)
                   and node.tag == "input"

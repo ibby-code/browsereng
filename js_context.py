@@ -1,10 +1,19 @@
 import browser
 import dukpy
 from css_parser import CSSParser, SelectorParsingException
+from enum import Enum
 from html_parser import Node
 
 RUNTIME_JS_FILE = "runtime.js"
 RUNTIME_JS = open(RUNTIME_JS_FILE).read()
+
+EVENT_DISPATCH_JS = \
+    "new Node(dukpy.handle).dispatchEvent(dukpy.type)"
+
+class JSEvent(Enum): 
+    CLICK = "click"
+    KEYDOWN = "keydown"
+    SUBMIT = "submit"
 
 
 class JSContext:
@@ -23,6 +32,10 @@ class JSContext:
             return self.interp.evaljs(code)
         except dukpy.JSRuntimeError as e:
             print("Script", script, "crashed", e)
+        
+    def dispatch_event(self, type: JSEvent, elt: Node): 
+        handle = self.node_to_handle.get(elt, -1)
+        self.interp.evaljs(EVENT_DISPATCH_JS, type=type.value, handle=handle)
 
     def query_selector_all(self, selector_text: str | None) -> list[int]:
         if not selector_text:
