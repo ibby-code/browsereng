@@ -58,7 +58,7 @@ class URL:
         if "://" in url:
             return URL(url)
         if self.scheme == "file":
-            if "/" in url and "/" in self.path:
+            if "/" in self.path:
                 url = get_relative_url(self.path.rsplit("/", 1)[0] + "/", url)
         elif not url.startswith("/"):
             url = get_relative_url(self.path, url)

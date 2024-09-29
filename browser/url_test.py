@@ -63,6 +63,15 @@ RESOLVE_TEST_CASES = [
     {
         "name": "relative file url",
         "originalUrl": "file://boo/foo/test.html",
+        "resolveUrl": "test.css",
+        "host": "",
+        "port": 0,
+        "scheme": "file",
+        "path": "boo/foo/test.css",
+    },
+    {
+        "name": "relative file url with ..",
+        "originalUrl": "file://boo/foo/test.html",
         "resolveUrl": "../../test.css",
         "host": "",
         "port": 0,
@@ -170,9 +179,77 @@ class TestUrl(unittest.TestCase):
         self.assertEqual(response, ("Body", 0))
 
     @patch("socket.socket")
+    def test_http_transfer_encoding_chunked(self, mock_socket_ctr):
+        http_r = (
+            "HTTP/1.1 200 OK\r\n" +
+            "Transfer-Encoding: chunked\r\n\r\n" +
+            "8; ignore-stuff\r\n" +
+            "birthday\r\n" +
+            "4\r\n" +
+            " day\r\n" + 
+            "0\r\nsome-footer: some-value\r\n\r\n"
+        )
+        get_mock_socket(mock_socket_ctr, [http_r])
+
+        test_url = "http://google.com:80/something"
+        u = url.URL(test_url)
+
+        response = u.request()
+        self.assertEqual(response, ("birthday day", 0))
+
+    @patch("socket.socket")
+    def test_http_transfer_encoding_chunked_with_content_type(
+        self, mock_socket_ctr):
+        charset = "ascii"
+        # ensure the string is long enough to test hex encoding 
+        first_chunk = "birthday " * 10
+        second_chunk = "day"
+        http_r = (
+            "HTTP/1.1 200 OK\r\n" +
+            "Transfer-Encoding: chunked\r\n" +
+            f"Content-Type: text/html; charset={charset}\r\n\r\n" +
+            f"{hex(len(first_chunk))}; ignore-stuff\r\n" +
+            f"{first_chunk} \r\n" +
+            f"{hex(len(second_chunk))}\r\n" +
+            f"{second_chunk} \r\n" + 
+            "0\r\nsome-footer: some-value\r\n\r\n"
+        )
+        get_mock_socket(mock_socket_ctr, [http_r])
+
+        test_url = "http://google.com:80/something"
+        u = url.URL(test_url)
+
+        response = u.request()
+        self.assertEqual(response, (first_chunk + second_chunk, 0))
+    
+    @patch("socket.socket")
+    def test_http_transfer_encoding_chunked_with_content_type_fails(
+        self, mock_socket_ctr):
+        charset = "ascii"
+        first_chunk = "你好世界"
+        http_r = (
+            "HTTP/1.1 200 OK\r\n" +
+            "Transfer-Encoding: chunked\r\n" +
+            f"Content-Type: text/html; charset={charset}\r\n\r\n" +
+            f"{hex(len(first_chunk))}; ignore-stuff\r\n" +
+            f"{first_chunk} \r\n" +
+            "0\r\nsome-footer: some-value\r\n\r\n"
+        )
+        get_mock_socket(mock_socket_ctr, [http_r])
+
+        test_url = "http://google.com:80/something"
+        u = url.URL(test_url)
+
+        try:
+            u.request()
+            self.assertFalse("Expected decode error")
+        except UnicodeDecodeError:
+            self.assertTrue("Unicode decode error thrown correctly")
+    
+    @patch("socket.socket")
     def test_http_unsupported_header(self, mock_socket_ctr):
         http_r = (
-            "HTTP/1.1 200 OK\r\n" + "Transfer-Encoding: chunked\r\n\r\n" + "Body text"
+            "HTTP/1.1 200 OK\r\n" + "Transfer-Encoding: gzip\r\n\r\n" + "Body text"
         )
         get_mock_socket(mock_socket_ctr, [http_r])
 
