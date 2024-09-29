@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from PIL import ImageTk
+from tkinter import font
 
 
 @dataclass
@@ -72,7 +73,7 @@ class DrawText:
     left: int
     top: int
     text: str
-    font: "tkinter.font.Font"
+    font: font.Font
     color: str
     bottom: int = field(init=False)
     rect: Rect = field(init=False)
