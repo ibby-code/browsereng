@@ -54,7 +54,13 @@ Object.defineProperty(Node.prototype, 'innerHTML', {
     set: function(s) {
         call_python("innerHTML_set", this.handle, s.toString());
     }
-})
+});
+
+Object.defineProperty(Node.prototype, 'value', {
+    get: function() {
+        return call_python("value_get", this.handle);
+    }
+});
 
 Node.prototype.getAttribute = function(attr) {
     return call_python("getAttribute", this.handle, attr);
@@ -68,10 +74,22 @@ Node.prototype.addEventListener = function(type, listener) {
     list.push(listener);
 }
 
-Node.prototype.dispatchEvent = function(type) {
+Node.prototype.dispatchEvent = function(evt) {
+    var type = evt.type;
     var handle = this.handle;
     var list =  (LISTENERS[handle] && LISTENERS[handle][type]) || [];
     for (var i = 0; i < list.length; i++) {
-        list[i].call(this)
+        list[i].call(this, evt)
     }
+    return evt.defaultEnabled;
+}
+
+function Event(type, value) {
+    this.type = type;
+    this.value = value;
+    this.defaultEnabled = true;
+}
+
+Event.prototype.preventDefault = function() {
+    this.defaultEnabled = false;
 }

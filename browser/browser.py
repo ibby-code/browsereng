@@ -638,7 +638,7 @@ class Tab:
 
     def keypress(self, char):
         if self.focus:
-            self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
+            if self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus, char): return
             if self.focus.tag == "input":
                 self.focus.attributes["value"] += char
                 self.render()
@@ -647,7 +647,7 @@ class Tab:
 
     def backspace(self):
         if self.focus:
-            self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
+            if self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus, "backspace"): return
             if self.focus.tag == "input":
                 orig_value = self.focus.attributes["value"]
                 # return if there is nothing to delete
@@ -660,7 +660,7 @@ class Tab:
 
     def enter(self):
         if self.focus:
-            self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus)
+            if self.js.dispatch_event(js_context.JSEvent.KEYDOWN, self.focus, "enter"): return
             if self.focus.tag == "input":
                 elt = self.try_submit_form_parent(self.focus)
                 if elt:
@@ -688,7 +688,7 @@ class Tab:
                 elt = elt.parent
                 continue
             if elt.tag == "a" and "href" in elt.attributes:
-                self.js.dispatch_event(js_context.JSEvent.CLICK, elt)
+                if self.js.dispatch_event(js_context.JSEvent.CLICK, elt): return
                 href = elt.attributes["href"]
                 print("href", href)
                 # ignore fragment links
@@ -697,7 +697,7 @@ class Tab:
                 url = self.url.resolve(href)
                 return self.load(url)
             elif elt.tag == "input":
-                self.js.dispatch_event(js_context.JSEvent.CLICK, elt)
+                if self.js.dispatch_event(js_context.JSEvent.CLICK, elt): return
                 elt.attributes["value"] = ""
                 if self.focus:
                     self.focus.is_focused = False
@@ -705,7 +705,7 @@ class Tab:
                 elt.is_focused = True
                 return self.render()
             elif elt.tag == "button":
-                self.js.dispatch_event(js_context.JSEvent.CLICK, elt)
+                if self.js.dispatch_event(js_context.JSEvent.CLICK, elt): return
                 elt = self.try_submit_form_parent(elt)
             if elt:
                 elt = elt.parent
@@ -725,7 +725,7 @@ class Tab:
         return elt
 
     def submit_form(self, elt: html_parser.Element):
-        self.js.dispatch_event(js_context.JSEvent.SUBMIT, elt)
+        if self.js.dispatch_event(js_context.JSEvent.SUBMIT, elt): return
         inputs = [
             node
             for node in tree_to_list(elt, [])
@@ -795,7 +795,7 @@ def style(node: html_parser.Node, rules: list[tuple[Selector, dict[str, str]]]):
         style(child, rules)
 
 
-def tree_to_list(tree, list):
+def tree_to_list(tree: html_parser.Node, list: list[html_parser.Node]) -> list[html_parser.Node]:
     list.append(tree)
     for child in tree.children:
         tree_to_list(child, list)

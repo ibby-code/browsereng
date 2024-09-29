@@ -8,6 +8,8 @@ const MISSING_RESPONSE: &str = "404 Not Found";
 const COMMENT_JS: &str = include_str!("comment.js");
 const COMMENT_CSS: &str = include_str!("comment.css");
 
+const MAX_ENTRY_LENGTH: usize = 10;
+
 #[derive(Debug)]
 enum ServerError {
     MalformedHeader,
@@ -74,7 +76,9 @@ fn do_request(
         let params = decode_form(body);
         match params.get("guest") {
             Some(guest) => {
-                entries.push(guest.clone());
+                if guest.chars().count() <= MAX_ENTRY_LENGTH { 
+                    entries.push(guest.clone());
+                }
             }
             _ => println!("Missing guest value"),
         }

@@ -6,8 +6,13 @@ console.log(5);
 console.log([2, "bye", {"1": 2}, [9, 3]]);
 
 var targetEl = document.querySelectorAll(".target")[0];
-function handleKeyDown() {
-  var value = this.getAttribute("value");
+function handleKeyDown(evt) {
+  var value = this.value;
+  if (evt.value == "backspace") {
+    value = value.slice(0, -1);
+  } else {
+    value += evt.value;
+  }
   targetEl.innerHTML = "<b>" + value + "</b";
 }
 

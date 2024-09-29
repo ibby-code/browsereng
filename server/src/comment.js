@@ -1,11 +1,14 @@
 console.log("loaded comment!");
 
 var strong = document.querySelectorAll("strong")[0];
+var allowSubmit = true;
 
-function lengthCheck() {
-    var value = this.getAttribute("value") || "";
+function lengthCheck(evt) {
+    var value = this.value || "";
     var displayValue = "";
-    if (value.length > 10) {
+    var lengthModifier = evt.value === "backspace" ? -1 : 1;
+    allowSubmit = value.length + lengthModifier <= 10;
+    if (!allowSubmit) {
         displayValue = "Comment too long!";
     } 
     strong.innerHTML = displayValue;
@@ -15,3 +18,8 @@ var inputs = document.querySelectorAll("input");
 for (var i = 0; i < inputs.length; i++) {
     inputs[i].addEventListener("keydown", lengthCheck);
 }
+
+var form = document.querySelectorAll("form")[0];
+form.addEventListener("submit", function(e) {
+    if (!allowSubmit) e.preventDefault();
+});
