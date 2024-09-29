@@ -1,17 +1,16 @@
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
 
 const OK_RESPONSE: &str = "200 OK";
 const MISSING_RESPONSE: &str = "404 Not Found";
-const SERVER_ERROR_RESPONSE: &str = "500 Internal Server Error";
+
+const COMMENT_JS: &str = include_str!("comment.js");
+const COMMENT_CSS: &str = include_str!("comment.css");
 
 #[derive(Debug)]
 enum ServerError {
     MalformedHeader,
-    ServeJsError,
     Utf8ParseError,
     UnsupportedMethod,
     WriteToStream,
@@ -21,7 +20,7 @@ type ServerResult = Result<usize, ServerError>;
 
 fn get_comments_html(entries: &Vec<String>) -> String {
     let mut out = String::new();
-    out.push_str("<html><body>");
+    out.push_str("<html><head><link rel=\"stylesheet\" href=\"comment.css\"/></head><body>");
     for entry in entries {
         out.push_str(&format!("<p>{}</p>", entry));
     }
@@ -29,10 +28,10 @@ fn get_comments_html(entries: &Vec<String>) -> String {
         "<form action=\"add\" method=\"post\"> \
                     <p><input name=\"guest\"></p> \
                     <p><button>Sign the book!</button></p> \
-                    </form",
+                    </form>",
     );
     out.push_str("<strong></strong>");
-    out.push_str("<script src=\"/comment.js\"</script>");
+    out.push_str("<script src=\"/comment.js\"></script>");
     out.push_str("</body></html>");
     out
 }
@@ -68,27 +67,9 @@ fn do_request(
     let response = if method == "GET" && url == "/" {
         (OK_RESPONSE, get_comments_html(entries))
     } else if method == "GET" && url == "/comment.js" {
-        let comment_path = Path::new("comment.js");
-        let mut comment_contents = String::new();
-        let mut comment_file = match File::open(&comment_path) {
-            Ok(file) => file,
-            Err(_) => {
-                return (
-                    SERVER_ERROR_RESPONSE,
-                    get_server_error_body(ServerError::ServeJsError),
-                )
-            }
-        };
-        match comment_file.read_to_string(&mut comment_contents) {
-            Ok(_) => (),
-            Err(_) => {
-                return (
-                    SERVER_ERROR_RESPONSE,
-                    get_server_error_body(ServerError::ServeJsError),
-                )
-            }
-        }
-        return (OK_RESPONSE, comment_contents);
+        return (OK_RESPONSE, String::from(COMMENT_JS));
+    } else if method == "GET" && url == "/comment.css" {
+        return (OK_RESPONSE, String::from(COMMENT_CSS));
     } else if method == "POST" && url == "/add" {
         let params = decode_form(body);
         match params.get("guest") {
