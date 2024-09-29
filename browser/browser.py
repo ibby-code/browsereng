@@ -18,7 +18,7 @@ from css_parser import CSSParser, Selector
 
 DEFAULT_BROWSER_TITLE = "CanYouBrowseIt"
 BG_DEFAULT_COLOR = "white"
-DEFAULT_FILE = "file://test.html"
+DEFAULT_FILE = "file://testing/test.html"
 DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 HOME_IMAGE = "img/home.png"
 HOME_IMAGE_SIZE = 24
