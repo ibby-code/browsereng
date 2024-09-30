@@ -55,6 +55,26 @@ class Node:
     style: dict[str, str] = field(kw_only=True, default_factory=dict)
     parent: "Node"
 
+    def __eq__(self, other: object) -> bool:
+        """Check equality
+
+        Checks whether children, styles are equal
+        """
+        if isinstance(other, Node):
+            return (
+                self.children == other.children
+                and all(
+                    [
+                        key in other.style and other.style[key] == value
+                        for key, value in self.style.items()
+                    ]
+                )
+            )
+        return False
+    
+    def __repr__(self):
+        return f"style:{repr(self.style)} children:{repr(self.children)}"
+
 
 @dataclass()
 class Text(Node):
@@ -62,7 +82,13 @@ class Text(Node):
     is_focused = False
 
     def __repr__(self):
-        return repr(self.text)
+        return f"<Text: {repr(self.text)} {super().__repr__()}>"
+
+    def __eq__(self, other: object) -> bool:
+        is_eq = super().__eq__(other)
+        if is_eq:
+            return self.text == other.text
+        return False
 
 
 @dataclass()
@@ -72,12 +98,18 @@ class Element(Node):
     is_focused = False
 
     def __repr__(self):
-        return f"<{self.tag}>"
+        return f"<Element: {self.tag} {super().__repr__()} attr:{repr(self.attributes)}>"
 
     def __eq__(self, other):
-        if isinstance(other, Node):
-            return id(self) == id(other)
-        return NotImplemented
+        is_eq = super().__eq__(other)
+        if is_eq:
+            return self.tag == other.tag and all(
+                [
+                    key in other.attributes and other.attributes[key] == value
+                    for key, value in self.attributes.items()
+                ]
+            )
+        return False 
 
     def __hash__(self):
         return hash((id(self)))
@@ -231,6 +263,13 @@ def print_tree(node, indent=0):
     print(" " * indent, node)
     for child in node.children:
         print_tree(child, indent + 2)
+
+
+def tree_to_list(tree: Node, list: list[Node]) -> list[Node]:
+    list.append(tree)
+    for child in tree.children:
+        tree_to_list(child, list)
+    return list
 
 
 if __name__ == "__main__":

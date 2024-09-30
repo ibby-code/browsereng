@@ -2,7 +2,7 @@ import browser
 import dukpy
 from css_parser import CSSParser, SelectorParsingException
 from enum import Enum
-from html_parser import Element, HTMLParser, Text
+from html_parser import Element, HTMLParser, tree_to_list
 
 RUNTIME_JS_FILE = "runtime.js"
 RUNTIME_JS = open(RUNTIME_JS_FILE).read()
@@ -51,7 +51,7 @@ class JSContext:
             selector = CSSParser(selector_text).selector()[0]
             nodes = [
                 node
-                for node in browser.tree_to_list(self.tab.nodes, [])
+                for node in tree_to_list(self.tab.nodes, [])
                 if selector.matches(node)
             ]
             return [self.get_handle(node) for node in nodes]
