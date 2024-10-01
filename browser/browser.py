@@ -348,6 +348,8 @@ class Chrome:
 
 class Browser:
     def __init__(self):
+        self.cookie_jar: dict[str, str] = {}
+        self.url_cache: dict[url.URL, (str, int, int)] = {}
         self.tabs: list[Tab] = []
         self.active_tab: Tab | None = None
         self.window = tkinter.Tk()
@@ -437,7 +439,7 @@ class Browser:
             self.draw()
 
     def new_tab(self, url):
-        new_tab = Tab(HEIGHT - self.chrome.bottom)
+        new_tab = Tab(self.cookie_jar, self.url_cache, HEIGHT - self.chrome.bottom)
         new_tab.load(url)
         self.active_tab = new_tab
         self.tabs.append(new_tab)
@@ -456,9 +458,14 @@ class Browser:
 
 
 class Tab:
-    def __init__(self, tab_height):
-        # TODO: share cache across tabs?
-        self.cache = {}
+    def __init__(
+        self,
+        cookie_jar: dict[str, str],
+        cache: dict[url.URL, (str, int, int)],
+        tab_height: int,
+    ):
+        self.cookie_jar = cookie_jar
+        self.cache = cache
         self.title = ""
         self.backward_history = []
         self.forward_history = []
@@ -541,7 +548,7 @@ class Tab:
                 is_view_source = True
                 link = input[len(VIEW_SOURCE) :]
 
-            self.url = url.URL(link)
+            self.url = url.URL(self.cookie_jar, link)
         else:
             self.url = input
         skip_cache = load_action == LoadAction.FORM

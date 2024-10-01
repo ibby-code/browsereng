@@ -86,7 +86,7 @@ class TestUrl(unittest.TestCase):
     def test_resolve(self):
         for test_data in RESOLVE_TEST_CASES:
             with self.subTest(test_data["name"]):
-                link = url.URL(test_data["originalUrl"])
+                link = url.URL({}, test_data["originalUrl"])
                 newUrl = link.resolve(test_data["resolveUrl"])
                 self.assertEqual(newUrl.host, test_data["host"])
                 self.assertEqual(newUrl.port, test_data["port"])
@@ -96,24 +96,24 @@ class TestUrl(unittest.TestCase):
     @patch("builtins.open", new_callable=mock_open, read_data=FAKE_FILE)
     def test_file(self, file):
         test_file = "C:/Users/user/Documents/txt.txt"
-        u = url.URL(f"file://{test_file}")
+        u = url.URL({}, f"file://{test_file}")
         self.assertEqual(u.request(), (FAKE_FILE, 0))
         file.assert_called_with(test_file, "r")
 
     def test_data(self):
         test_message = "hello world!"
-        u = url.URL(f"data:text/html,{test_message}")
+        u = url.URL({}, f"data:text/html,{test_message}")
         self.assertEqual(u.request(), (test_message, 0))
 
     @patch("socket.socket")
     def test_http_get(self, mock_socket_ctr):
         mock_socket = get_mock_socket(mock_socket_ctr)
-        request = f"GET /something HTTP/1.1\r\n"
-        request += f"Host: google.com\r\n"
-        request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
+        request = "GET /something HTTP/1.1\r\n" + \
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
 
         test_url = "http://google.com:4229/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         mock_socket.connect.assert_called_once_with(("google.com", 4229))
@@ -124,14 +124,14 @@ class TestUrl(unittest.TestCase):
     def test_http_post(self, mock_socket_ctr):
         body = "This body is a wonderland"
         mock_socket = get_mock_socket(mock_socket_ctr)
-        request = f"POST /something HTTP/1.1\r\n"
-        request += f"Content-Length: {len(body.encode("utf-8"))}\r\n"
-        request += f"Host: google.com\r\n"
-        request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
+        request = "POST /something HTTP/1.1\r\n" + \
+            f"Content-Length: {len(body.encode("utf-8"))}\r\n" + \
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
         request += body
 
         test_url = "http://google.com:4229/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         u.request(body)
 
         mock_socket.send.assert_called_once_with(request.encode("utf-8"))
@@ -141,7 +141,7 @@ class TestUrl(unittest.TestCase):
         mock_socket = get_mock_socket(mock_socket_ctr)
 
         test_url = "http://google.com/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         u.request()
 
         mock_socket.connect.assert_called_once_with(("google.com", 80))
@@ -151,7 +151,7 @@ class TestUrl(unittest.TestCase):
         mock_socket = get_mock_socket(mock_socket_ctr)
 
         test_url = "http://google.com:80"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         u.request()
 
         mock_socket.connect.assert_called_once_with(("google.com", 80))
@@ -161,7 +161,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [HTTP_RESPONSE, HTTP_RESPONSE])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         u.request()
         u.request()
 
@@ -173,7 +173,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         self.assertEqual(response, ("Body", 0))
@@ -192,7 +192,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
 
         response = u.request()
         self.assertEqual(response, ("birthday day", 0))
@@ -217,7 +217,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
 
         response = u.request()
         self.assertEqual(response, (first_chunk + second_chunk, 0))
@@ -238,7 +238,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
 
         try:
             u.request()
@@ -254,7 +254,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
 
         try:
             u.request()
@@ -270,7 +270,7 @@ class TestUrl(unittest.TestCase):
         mock_ctx.wrap_socket.return_value = mock_socket
 
         test_url = "https://google.com/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         mock_socket.connect.assert_called_once_with(("google.com", 443))
@@ -278,19 +278,15 @@ class TestUrl(unittest.TestCase):
 
     @patch("socket.socket")
     def test_http_redirect(self, mock_socket_ctr):
-        request_one = f"GET /something HTTP/1.1\r\n"
-        request_one += f"Host: google.com\r\n"
-        request_one += f"User-Agent: CanYouBrowseIt\r\n\r\n"
-        request_two = f"GET /somethingelse HTTP/1.1\r\n"
-        request_two += f"Host: google.com\r\n"
-        request_two += f"User-Agent: CanYouBrowseIt\r\n\r\n"
+        request_one = "GET /something HTTP/1.1\r\nHost: google.com\r\nUser-Agent: CanYouBrowseIt\r\n\r\n"
+        request_two = "GET /somethingelse HTTP/1.1\r\nHost: google.com\r\nUser-Agent: CanYouBrowseIt\r\n\r\n"
 
         redirect_url = "http://google.com/somethingelse"
         http_r = f"HTTP/1.1 301 MovedPermanentely\r\nLocation: {redirect_url}\r\n\r\nBody text"
         mock_socket = get_mock_socket(mock_socket_ctr, [http_r, HTTP_RESPONSE])
 
         test_url = "http://google.com/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         mock_socket.send.assert_has_calls(
@@ -305,7 +301,7 @@ class TestUrl(unittest.TestCase):
         mock_socket = get_mock_socket(mock_socket_ctr, [http_r, HTTP_RESPONSE])
 
         test_url = "http://google.com/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         mock_socket.connect.asset_has_calls(
@@ -323,7 +319,7 @@ class TestUrl(unittest.TestCase):
         )
 
         test_url = "http://google.com/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         self.assertEqual(
@@ -338,7 +334,7 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         self.assertEqual(response, ("Body text", age))
@@ -351,10 +347,39 @@ class TestUrl(unittest.TestCase):
         get_mock_socket(mock_socket_ctr, [http_r])
 
         test_url = "http://google.com:80/something"
-        u = url.URL(test_url)
+        u = url.URL({}, test_url)
         response = u.request()
 
         self.assertEqual(response, ("Body text", 0))
+
+    @patch("socket.socket")
+    def test_http_send_cookie(self, mock_socket_ctr):
+        cookie = "my_cookie"
+        mock_socket = get_mock_socket(mock_socket_ctr)
+        request = f"GET /something HTTP/1.1\r\n" + \
+            f"Cookie: {cookie}\r\n" + \
+            f"Host: google.com\r\n" + \
+            f"User-Agent: CanYouBrowseIt\r\n\r\n"
+
+        test_url = "http://google.com:4229/something"
+        u = url.URL({"google.com": cookie}, test_url)
+        u.request()
+
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
+
+    @patch("socket.socket")
+    def test_http_set_cookie(self, mock_socket_ctr):
+        cookie = "my_cookie"
+        cookie_jar = {}
+        http_r = "HTTP/1.0 200 OK\r\n" + \
+            f"set-cookie: {cookie}\r\n\r\n" + "Body text"
+        get_mock_socket(mock_socket_ctr, [http_r])
+
+        test_url = "http://google.com:4229/something"
+        u = url.URL(cookie_jar, test_url)
+        u.request()
+
+        self.assertEqual(cookie_jar.get("google.com", None), cookie)
 
 
 def get_mock_socket(mock_socket_ctr, http_responses=[HTTP_RESPONSE]):

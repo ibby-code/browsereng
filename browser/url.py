@@ -6,7 +6,8 @@ REDIRECT_LIMIT = 5
 
 
 class URL:
-    def __init__(self, url: str):
+    def __init__(self, cookie_jar: dict[str, str], url: str):
+        self.cookie_jar = cookie_jar
         self.socket = None
         self.scheme, url = url.split(":", 1)
         # for http schemes
@@ -56,14 +57,14 @@ class URL:
     # trying to make this work for files
     def resolve(self, url: str):
         if "://" in url:
-            return URL(url)
+            return URL(self.cookie_jar, url)
         if self.scheme == "file":
             if "/" in self.path:
                 url = get_relative_url(self.path.rsplit("/", 1)[0] + "/", url)
         elif not url.startswith("/"):
             url = get_relative_url(self.path, url)
         if url.startswith("//"):
-            return URL(self.scheme + ":" + url)
+            return URL(self.cookie_jar, self.scheme + ":" + url)
         else:
             base = (
                 self.scheme
@@ -73,7 +74,7 @@ class URL:
             )
             if not base.endswith("/") and not url.startswith("/"):
                 base += "/"
-            return URL(base + url)
+            return URL(self.cookie_jar, base + url)
 
     def request(self, payload=None):
         """Returns tuple with response and cache time"""
@@ -102,6 +103,9 @@ class URL:
         if payload:
             length = len(payload.encode("utf-8"))
             request += f"Content-Length: {length}\r\n"
+        cookie = self.cookie_jar.get(self.host, None)
+        if cookie:
+            request += f"Cookie: {cookie}\r\n"
         request += f"Host: {self.host}\r\n"
         request += f"User-Agent: CanYouBrowseIt\r\n\r\n"
         # encode request as bytes to send
@@ -133,7 +137,7 @@ class URL:
         ):
             raw_response.close()
             location = response_headers["location"]
-            redirect_url = URL(location)
+            redirect_url = URL(self.cookie_jar, location)
             print(f"redirect {redirect} to {location}")
             if self.can_use_same_socket(redirect_url):
                 self.path = redirect_url.path
@@ -148,6 +152,10 @@ class URL:
         # fail unsupported headers
         assert "content-encoding" not in response_headers
         assert response_headers["transfer-encoding"] == "chunked" if "transfer-encoding" in response_headers else True
+
+        cookie = response_headers.get("set-cookie", None)
+        if cookie:
+            self.cookie_jar[self.host] = cookie
 
         # respect content-length
         if "transfer-encoding" in response_headers:
