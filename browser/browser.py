@@ -9,8 +9,7 @@ import tkinter.font
 import typing
 import url
 import urllib
-from dataclasses import dataclass
-from display_constants import *
+from display_constants import HEIGHT, POINTER_HOVER_TAG, SCROLL_STEP, WIDTH, VSTEP
 from enum import Enum
 from functools import partial
 from PIL import ImageTk, Image
@@ -622,10 +621,10 @@ class Tab:
     def scroll_to_fragment(self, fragment: str, layout_list):
         print(f"scrolling to {fragment}")
         layout_y = [
-            l.y
-            for l in layout_list
-            if isinstance(l.node, layout.Element)
-            and l.node.attributes.get("id", "") == fragment[1:]
+            item.y
+            for item in layout_list
+            if isinstance(item.node, layout.Element)
+            and item.node.attributes.get("id", "") == fragment[1:]
         ]
         if not len(layout_y) > 0:
             return

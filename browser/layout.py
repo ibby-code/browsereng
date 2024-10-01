@@ -2,7 +2,7 @@ import tkinter
 import re
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
-from display_constants import *
+from display_constants import HSTEP, INPUT_WIDTH_PX, LEADING_FACTOR, POINTER_HOVER_TAG, WIDTH 
 from draw_commands import DrawRect, Rect, DrawText, DrawOutline, DrawLine
 
 

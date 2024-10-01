@@ -342,7 +342,7 @@ class TestUrl(unittest.TestCase):
     @patch("socket.socket")
     def test_http_cache_nostore(self, mock_socket_ctr):
         http_r = (
-            f"HTTP/1.1 200 OK\r\nCache-Control: max-age=1024,nostore\r\n\r\nBody text"
+            "HTTP/1.1 200 OK\r\nCache-Control: max-age=1024,nostore\r\n\r\nBody text"
         )
         get_mock_socket(mock_socket_ctr, [http_r])
 
@@ -356,10 +356,10 @@ class TestUrl(unittest.TestCase):
     def test_http_send_cookie(self, mock_socket_ctr):
         cookie = "my_cookie"
         mock_socket = get_mock_socket(mock_socket_ctr)
-        request = f"GET /something HTTP/1.1\r\n" + \
+        request = "GET /something HTTP/1.1\r\n" + \
             f"Cookie: {cookie}\r\n" + \
-            f"Host: google.com\r\n" + \
-            f"User-Agent: CanYouBrowseIt\r\n\r\n"
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
 
         test_url = "http://google.com:4229/something"
         u = url.URL({"google.com": cookie}, test_url)

@@ -113,7 +113,7 @@ class CSSParser:
                 self.literal("}")
                 for selector in selectors:
                     rules.append((selector, body))
-            except SelectorParsingException as e:
+            except SelectorParsingException:
                 # debugging purposes
                 # error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
                 # print(f"selector exception at {self.i}\nchar:{error_c}")
@@ -125,7 +125,7 @@ class CSSParser:
                 else:
                     # if we see open brackets, skip the block since we have no selector
                     self.ignore_block()
-            except (WordParsingException, LiteralParsingException) as e:
+            except (WordParsingException, LiteralParsingException):
                 # debugging purposes
                 # error_c = self.style[self.i] if self.i < len(self.style) else 'EOF'
                 # print(f"parse error at {self.i}\nchar:{error_c}\nerror {e}")
@@ -179,7 +179,7 @@ class CSSParser:
                     break
                 self.literal(";")
                 self.whitespace()
-            except Exception as e:
+            except Exception:
                 # debugging purposes
                 # print(f"body error at {self.i}\nchar:{self.style[self.i]}\npairs: {pairs}\nerror {e}")
                 why = self.ignore_until([";", "}"])

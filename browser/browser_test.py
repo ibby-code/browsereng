@@ -1,7 +1,5 @@
 
-import browser
 import unittest
-from unittest.mock import patch
 
 SHOW_TEST_CASES = [
     ('<div>Hi</div', 'Hi'),
