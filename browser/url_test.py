@@ -132,7 +132,7 @@ class TestUrl(unittest.TestCase):
 
         test_url = "http://google.com:4229/something"
         u = url.URL({}, test_url)
-        u.request(body)
+        u.request(None, body)
 
         mock_socket.send.assert_called_once_with(request.encode("utf-8"))
 
@@ -362,10 +362,84 @@ class TestUrl(unittest.TestCase):
             "User-Agent: CanYouBrowseIt\r\n\r\n"
 
         test_url = "http://google.com:4229/something"
-        u = url.URL({"google.com": cookie}, test_url)
+        u = url.URL({"google.com": (cookie, {})}, test_url)
         u.request()
 
         mock_socket.send.assert_called_once_with(request.encode("utf-8"))
+
+    @patch("socket.socket")
+    def test_http_send_cookie_samesite_get(self, mock_socket_ctr):
+        cookie = "my_cookie"
+        mock_socket = get_mock_socket(mock_socket_ctr)
+        request = "GET /something HTTP/1.1\r\n" + \
+            f"Cookie: {cookie}\r\n" + \
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
+
+        test_url = "http://google.com:4229/something"
+        referer = url.URL({}, "http://someothersite.com/something")
+        u = url.URL({"google.com": (cookie, {"samesite": "lax"})}, test_url)
+        u.request(referer)
+
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
+
+
+    @patch("socket.socket")
+    def test_http_send_cookie_post_samesite_valid_referer(self, mock_socket_ctr):
+        cookie = "my_cookie"
+        body = "This body is a wonderland"
+        mock_socket = get_mock_socket(mock_socket_ctr)
+        request = "POST /something HTTP/1.1\r\n" + \
+            f"Content-Length: {len(body.encode("utf-8"))}\r\n" + \
+            f"Cookie: {cookie}\r\n" + \
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
+        request += body
+
+        test_url = "http://google.com:4229/something"
+        referer = url.URL({}, "http://google.com:4229/somethingelse")
+        u = url.URL({"google.com": (cookie, {"same-site": "lax"})}, test_url)
+        u.request(referer, body)
+
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
+
+
+    @patch("socket.socket")
+    def test_http_send_cookie_samesite_invalid_referer(self, mock_socket_ctr):
+        body = "This body is a wonderland"
+        mock_socket = get_mock_socket(mock_socket_ctr)
+        request = "POST /something HTTP/1.1\r\n" + \
+            f"Content-Length: {len(body.encode("utf-8"))}\r\n" + \
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
+        request += body
+
+        test_url = "http://google.com:4229/something"
+        referer = url.URL({}, "http://someothersite.com/something")
+        u = url.URL({"google.com": ("my_cookie", {"samesite": "lax"})}, test_url)
+        u.request(referer, body)
+
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
+
+    @patch("socket.socket")
+    def test_http_send_cookie_samesite_other(self, mock_socket_ctr):
+        cookie = "my_cookie"
+        body = "This body is a wonderland"
+        mock_socket = get_mock_socket(mock_socket_ctr)
+        request = "POST /something HTTP/1.1\r\n" + \
+            f"Content-Length: {len(body.encode("utf-8"))}\r\n" + \
+            f"Cookie: {cookie}\r\n" + \
+            "Host: google.com\r\n" + \
+            "User-Agent: CanYouBrowseIt\r\n\r\n"
+        request += body
+
+        test_url = "http://google.com:4229/something"
+        referer = url.URL({}, "http://someothersite.com/something")
+        u = url.URL({"google.com": (cookie, {"same-site": "strict"})}, test_url)
+        u.request(referer, body)
+
+        mock_socket.send.assert_called_once_with(request.encode("utf-8"))
+
 
     @patch("socket.socket")
     def test_http_set_cookie(self, mock_socket_ctr):
@@ -379,7 +453,23 @@ class TestUrl(unittest.TestCase):
         u = url.URL(cookie_jar, test_url)
         u.request()
 
-        self.assertEqual(cookie_jar.get("google.com", None), cookie)
+        self.assertEqual(cookie_jar.get("google.com", None), (cookie, {}))
+
+    @patch("socket.socket")
+    def test_http_set_cookie_with_params(self, mock_socket_ctr):
+        cookie = "my_cookie"
+        params = {"samesite": "lax", "key": "value", "key_without_value": "true"}
+        full_cookie = f"{cookie};SameSite=Lax;key=value;key_without_value"
+        cookie_jar = {}
+        http_r = "HTTP/1.0 200 OK\r\n" + \
+            f"set-cookie: {full_cookie}\r\n\r\n" + "Body text"
+        get_mock_socket(mock_socket_ctr, [http_r])
+
+        test_url = "http://google.com:4229/something"
+        u = url.URL(cookie_jar, test_url)
+        u.request()
+
+        self.assertEqual(cookie_jar.get("google.com", None), (cookie, params))
 
 
 def get_mock_socket(mock_socket_ctr, http_responses=[HTTP_RESPONSE]):
