@@ -79,16 +79,16 @@ class URL:
                 base += "/"
             return URL(self.cookie_jar, base + url)
 
-    def request(self, payload=None):
+    def request(self, referer = None, payload=None):
         """Returns tuple with response and cache time"""
         if self.scheme in HTTP_SCHEMES:
-            return self.make_http_request(payload)
+            return self.make_http_request(referer, payload)
         elif self.scheme == "file":
             return self.make_file_request()
         elif self.scheme == "data":
             return self.make_data_request()
 
-    def make_http_request(self, payload=None, redirect=0) -> tuple[str, int]:
+    def make_http_request(self, referer = None, payload=None, redirect=0) -> tuple[str, int]:
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -106,9 +106,14 @@ class URL:
         if payload:
             length = len(payload.encode("utf-8"))
             request += f"Content-Length: {length}\r\n"
-        cookie = self.cookie_jar.get(self.host, None)
-        if cookie:
-            request += f"Cookie: {cookie}\r\n"
+        cookie_entry = self.cookie_jar.get(self.host, None)
+        if cookie_entry:
+            cookie, params = cookie_entry
+            allow_cookie = True
+            if referer and params.get("samesite", "none") == "lax" and method != "GET":
+                allow_cookie = self.host == referer.host
+            if allow_cookie:
+                request += f"Cookie: {cookie_entry[0]}\r\n"
         request += f"Host: {self.host}\r\n"
         request += "User-Agent: CanYouBrowseIt\r\n\r\n"
         # encode request as bytes to send
@@ -160,6 +165,16 @@ class URL:
         cookie = response_headers.get("set-cookie", None)
         if cookie:
             self.cookie_jar[self.host] = cookie
+            params = {}
+            if ";" in cookie:
+                cookie, rest = cookie.split(";", 1)
+                for param in rest.split(";"):
+                    if "=" in param:
+                        param, value = param.split("=", 1)
+                    else:
+                        value = "true"
+                    params[param.strip().casefold()] = value.casefold()
+            self.cookie_jar[self.host] = (cookie, params)
 
         # respect content-length
         if "transfer-encoding" in response_headers:

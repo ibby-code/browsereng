@@ -497,7 +497,7 @@ class Tab:
                 if cached_response:
                     css, cache_time = cached_response
                 else:
-                    css, cache_time = style_url.request()
+                    css, cache_time = style_url.request(self.url)
                 self.cache_request(style_url, css, cache_time)
             except:
                 continue
@@ -522,7 +522,7 @@ class Tab:
                 if cached_response:
                     js, cache_time = cached_response
                 else:
-                    js, cache_time = script_url.request()
+                    js, cache_time = script_url.request(self.url)
                 self.cache_request(script_url, js, cache_time)
             except:
                 continue
@@ -547,17 +547,18 @@ class Tab:
                 is_view_source = True
                 link = input[len(VIEW_SOURCE) :]
 
-            self.url = url.URL(self.cookie_jar, link)
+            new_url = url.URL(self.cookie_jar, link)
         else:
-            self.url = input
+            new_url = input
         skip_cache = load_action == LoadAction.FORM
-        cache_response = None if skip_cache else self.request_from_cache(self.url)
+        cache_response = None if skip_cache else self.request_from_cache(new_url)
         if cache_response:
             body, cache_time = cache_response
         else:
-            body, cache_time = self.url.request(payload)
+            body, cache_time = new_url.request(self.url, payload)
             if not skip_cache:
-                self.cache_request(self.url, body, cache_time)
+                self.cache_request(new_url, body, cache_time)
+        self.url = new_url
         self.nodes = (
             layout.Text(None, body)
             if is_view_source

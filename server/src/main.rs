@@ -293,7 +293,7 @@ fn handle_client(
         body_length = body.len()
     ));
     if header_map.get("cookie").is_none() {
-        response.push_str(&format!("Set-Cookie: token={token}\r\n", token = token));
+        response.push_str(&format!("Set-Cookie: token={token}; SameSite=Lax\r\n", token = token));
     }
     response.push_str("\r\n");
     response.push_str(&body);

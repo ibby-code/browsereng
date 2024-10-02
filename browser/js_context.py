@@ -84,7 +84,7 @@ class JSContext:
         if full_url.origin() != self.tab.origin():
             raise Exception("Cross-origin XHR requests are not allowed")
         # do we cache this at some point?
-        response, _ = full_url.request(body)
+        response, _ = full_url.request(self.tab.url, body)
         return response
 
     def get_handle(self, elt: Element) -> int:
