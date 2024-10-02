@@ -7,7 +7,9 @@ from html_parser import Element, HTMLParser, tree_to_list
 RUNTIME_JS_FILE = "runtime.js"
 RUNTIME_JS = open(RUNTIME_JS_FILE).read()
 
-EVENT_DISPATCH_JS = "new Node(dukpy.handle).dispatchEvent(new Event(dukpy.type, dukpy.payload))"
+EVENT_DISPATCH_JS = (
+    "new Node(dukpy.handle).dispatchEvent(new Event(dukpy.type, dukpy.payload))"
+)
 
 
 class JSEvent(Enum):
@@ -27,6 +29,7 @@ class JSContext:
         self.interp.export_function("getAttribute", self.get_attribute)
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
         self.interp.export_function("value_get", self.value_get)
+        self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
         self.run(RUNTIME_JS_FILE, RUNTIME_JS)
 
     def run(self, script: str, code: str):
@@ -38,10 +41,8 @@ class JSContext:
     def dispatch_event(self, type: JSEvent, elt: Element, payload: str = "") -> bool:
         handle = self.node_to_handle.get(elt, -1)
         default_enabled = self.interp.evaljs(
-            EVENT_DISPATCH_JS,
-            type=type.value,
-            handle=handle,
-            payload=payload)
+            EVENT_DISPATCH_JS, type=type.value, handle=handle, payload=payload
+        )
         return not default_enabled
 
     def query_selector_all(self, selector_text: str | None) -> list[int]:
@@ -72,12 +73,19 @@ class JSContext:
         for child in elt.children:
             child.parent = elt
         self.tab.render()
-    
+
     def value_get(self, handle: int) -> str:
         elt = self.handle_to_node[handle]
         if elt.tag == "input":
-           return self.get_attribute(handle, "value") 
+            return self.get_attribute(handle, "value")
 
+    def XMLHttpRequest_send(self, method: str, url: str, body: str) -> str:
+        full_url = self.tab.url.resolve(url)
+        if full_url.origin() != self.tab.origin():
+            raise Exception("Cross-origin XHR requests are not allowed")
+        # do we cache this at some point?
+        response, _ = full_url.request(body)
+        return response
 
     def get_handle(self, elt: Element) -> int:
         if elt not in self.node_to_handle:

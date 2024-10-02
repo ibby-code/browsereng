@@ -93,3 +93,17 @@ function Event(type, value) {
 Event.prototype.preventDefault = function() {
     this.defaultEnabled = false;
 }
+
+function XMLHttpRequest() {}
+
+XMLHttpRequest.prototype.open = function(method, url, is_async) {
+    if (is_async) throw Error("Async XHR is not supported");
+    this.method = method;
+    this.url = url;
+}
+
+XMLHttpRequest.prototype.send = function(body) {
+    this.responseText = call_python("XMLHttpRequest_send",
+        this.method, this.url, body
+    );
+}

@@ -31,9 +31,12 @@ class URL:
             self.host = ""
             self.port = 0
             self.path = url
+    
+    def origin(self):
+        return f"{self.scheme}://{self.host}:{self.port}"
 
     def get_id(self):
-        return f"{self.scheme}://{self.host}:{self.port}{self.path}"
+        return self.origin() + self.path
 
     def __str__(self) -> str:
         port_part = ":" + str(self.port)

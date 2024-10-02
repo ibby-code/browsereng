@@ -10,7 +10,8 @@ const UNAUTHORIZED_RESPONSE: &str = "401 Unauthorized";
 const COMMENT_JS: &str = include_str!("comment.js");
 const COMMENT_CSS: &str = include_str!("comment.css");
 const LOGIN_FORM_HTML: &str = include_str!("login_form.html");
-const INVALID_LOGIN_HTML: &str = "<html><body><h1>Invalid Login!</h1><a href=\"/login\">Try again!</a></body></html>";
+const INVALID_LOGIN_HTML: &str =
+    "<html><body><h1>Invalid Login!</h1><a href=\"/login\">Try again!</a></body></html>";
 const LOGIN_REQUIRED_HTML: &str =
     "<html><body><h1>You must be logged in to perform this action!</h1><a href=\"/login\">Sign in!</a></body></html>";
 
@@ -28,7 +29,14 @@ enum ServerError {
 
 type ServerResult = Result<usize, ServerError>;
 
-fn get_comments_html(session: &HashMap<String, String>, entries: &Vec<(String, String)>) -> String {
+fn get_random_number() -> String {
+    random::<usize>().to_string()[2..].to_string()
+}
+
+fn get_comments_html(
+    session: &mut HashMap<String, String>,
+    entries: &Vec<(String, String)>,
+) -> String {
     let mut out = String::new();
     out.push_str("<html><head><link rel=\"stylesheet\" href=\"comment.css\"/></head><body>");
     for entry in entries {
@@ -39,14 +47,21 @@ fn get_comments_html(session: &HashMap<String, String>, entries: &Vec<(String, S
         ));
     }
     let login_form_html = match session.get("user") {
-        Some(user) => format!(
-            "<h1>Hello, {user}</h1> \
+        Some(user) => {
+            let nonce = get_random_number();
+            let out = format!(
+                "<h1>Hello, {user}</h1> \
             <form action=\"add\" method=\"post\"> \
             <p><input name=\"guest\"></p> \
             <p><button>Sign the book!</button></p> \
+            <input name=\"nonce\" type=\"hidden\" value=\"{nonce}\"> \
             </form>",
-            user = user
-        ),
+                user = user,
+                nonce = &nonce,
+            );
+            session.insert("nonce".to_owned(), nonce);
+            out
+        }
         _ => String::from("<a href=\"/login\">Sign in to write in the guest book</a>"),
     };
     out.push_str(&login_form_html);
@@ -100,6 +115,39 @@ fn do_login(session: &mut HashMap<String, String>, data: HashMap<String, String>
     return false;
 }
 
+enum AddEntryError {
+    RequireLogin,
+    BadNonce,
+    MissingValue,
+}
+
+fn add_entry(
+    entries: &mut Vec<(String, String)>,
+    session: &HashMap<String, String>,
+    data: HashMap<String, String>,
+) -> Result<(), AddEntryError> {
+    let correct_nonce = match (session.get("nonce"), data.get("nonce")) {
+        (Some(session_nonce), Some(data_nonce)) => session_nonce == data_nonce,
+        _ => false,
+    };
+    if !correct_nonce {
+        return Err(AddEntryError::BadNonce);
+    }
+    let user = match session.get("user") {
+        Some(user) => user,
+        _ => return Err(AddEntryError::RequireLogin),
+    };
+    match data.get("guest") {
+        Some(guest) => {
+            if guest.chars().count() <= MAX_ENTRY_LENGTH {
+                entries.push((guest.clone(), user.clone()));
+            }
+        }
+        _ => return Err(AddEntryError::MissingValue),
+    }
+    Ok(())
+}
+
 fn do_request(
     entries: &mut Vec<(String, String)>,
     session: &mut HashMap<String, String>,
@@ -108,40 +156,34 @@ fn do_request(
     _headers: &HashMap<String, String>,
     body: String,
 ) -> (&'static str, String) {
-    let response = if method == "GET" && url == "/" {
+    return if method == "GET" && url == "/" {
         (OK_RESPONSE, get_comments_html(session, entries))
     } else if method == "GET" && url == "/login" {
-        return (OK_RESPONSE, String::from(LOGIN_FORM_HTML));
+        (OK_RESPONSE, String::from(LOGIN_FORM_HTML))
     } else if method == "GET" && url == "/comment.js" {
-        return (OK_RESPONSE, String::from(COMMENT_JS));
+        (OK_RESPONSE, String::from(COMMENT_JS))
     } else if method == "GET" && url == "/comment.css" {
-        return (OK_RESPONSE, String::from(COMMENT_CSS));
+        (OK_RESPONSE, String::from(COMMENT_CSS))
     } else if method == "POST" && url == "/" {
         let params = decode_form(body);
         let logged_in = do_login(session, params);
-        return match logged_in {
+        match logged_in {
             true => (OK_RESPONSE, get_comments_html(session, entries)),
             false => (UNAUTHORIZED_RESPONSE, String::from(INVALID_LOGIN_HTML)),
-        };
+        }
     } else if method == "POST" && url == "/add" {
         let params = decode_form(body);
-        let user = match session.get("user") {
-            Some(user) => user,
-            _ => return (UNAUTHORIZED_RESPONSE, String::from(LOGIN_REQUIRED_HTML)),
-        };
-        match params.get("guest") {
-            Some(guest) => {
-                if guest.chars().count() <= MAX_ENTRY_LENGTH {
-                    entries.push((guest.clone(), user.clone()));
-                }
+        match add_entry(entries, session, params) {
+            Ok(_) | Err(AddEntryError::BadNonce) | Err(AddEntryError::MissingValue) => {
+                (OK_RESPONSE, get_comments_html(session, entries))
             }
-            _ => println!("Missing guest value"),
+            Err(AddEntryError::RequireLogin) => {
+                (UNAUTHORIZED_RESPONSE, String::from(LOGIN_REQUIRED_HTML))
+            }
         }
-        (OK_RESPONSE, get_comments_html(session, entries))
     } else {
         (MISSING_RESPONSE, get_not_found_html(method, url))
     };
-    response
 }
 
 fn get_server_error_body(err: ServerError) -> String {
@@ -237,7 +279,7 @@ fn handle_client(
 
     let token = match &header_map.get("cookie") {
         Some(cookie) => &cookie[TOKEN_STRING_SIZE..],
-        _ => &random::<usize>().to_string()[2..],
+        _ => &get_random_number(),
     };
 
     println!("recieved body {body}");
