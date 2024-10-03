@@ -1,0 +1,5 @@
+HTTP/1.0 401 Unauthorized
+Content-Length: 80
+Set-Cookie: token=__rand__; SameSite=Lax
+
+<html><body><h1>Invalid Login!</h1><a href="/login">Try again!</a></body></html>

@@ -1,0 +1,5 @@
+HTTP/1.0 200 OK
+Content-Length: 234
+Set-Cookie: token=__rand__; SameSite=Lax
+
+<html><head><link rel="stylesheet" href="comment.css"/></head><body><p>Pavel was here <i>by crashoverride</i></p><a href="/login">Sign in to write in the guest book</a><strong></strong><script src="/comment.js"></script></body></html>

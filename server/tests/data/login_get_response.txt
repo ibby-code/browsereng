@@ -1,0 +1,13 @@
+HTTP/1.0 200 OK
+Content-Length: 266
+Set-Cookie: token=__rand__; SameSite=Lax
+
+<html>
+    <body>
+        <form action="/" method="post">
+            <p>Username: <input name="username"></p>
+            <p>Password: <input name="password" type="password"></p>
+            <p><button>Log in</button></p>
+        </form>
+    </body>
+</html>

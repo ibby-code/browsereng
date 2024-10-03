@@ -20,6 +20,8 @@ for (var i = 0; i < inputs.length; i++) {
 }
 
 var form = document.querySelectorAll("form")[0];
-form.addEventListener("submit", function(e) {
-    if (!allowSubmit) e.preventDefault();
-});
+if (form) {
+    form.addEventListener("submit", function(e) {
+        if (!allowSubmit) e.preventDefault();
+    });
+}
