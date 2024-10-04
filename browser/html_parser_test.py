@@ -1,6 +1,13 @@
 import unittest
 
-from html_parser import HTMLParser, Element, Text, get_tag_attributes, create_anon_block, tree_to_list
+from html_parser import (
+    HTMLParser,
+    Element,
+    Text,
+    get_tag_attributes,
+    create_anon_block,
+    tree_to_list,
+)
 
 
 TAG_ATTRIBUTES_CASES = [
@@ -20,6 +27,21 @@ TAG_ATTRIBUTES_CASES = [
         "case insensitive",
         'a href="google.com" HREF="apple.com"',
         {"tag": "a", "attrs": {"href": "apple.com"}},
+    ),
+    (
+        "key without value reads as true",
+        "input hidden",
+        {"tag": "input", "attrs": {"hidden": "true"}},
+    ),
+    (
+        "empty value with quotes",
+        'a href="" target=_blank',
+        {"tag": "a", "attrs": {"href": "", "target": "_blank"}},
+    ),
+    (
+        "value without quotes",
+        "a href=google.com target=_blank",
+        {"tag": "a", "attrs": {"href": "google.com", "target": "_blank"}},
     ),
 ]
 
@@ -120,7 +142,10 @@ class TestHTMLParser(unittest.TestCase):
         text_node = Text(p_node, "hello moto")
         p_node.children = [text_node]
 
-        self.assertEqual(tree_to_list(self.html_node, []), [self.html_node, self.body_node, p_node, text_node])
+        self.assertEqual(
+            tree_to_list(self.html_node, []),
+            [self.html_node, self.body_node, p_node, text_node],
+        )
 
     def test_get_tag_attributes(self):
         for title, input, ans in TAG_ATTRIBUTES_CASES:

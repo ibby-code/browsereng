@@ -238,24 +238,40 @@ def get_tag_attributes(text: str) -> tuple[str, dict[str, str]]:
     parts = text.split(None, 1)
     tag = parts[0].casefold()
     key_buffer = ""
-    val_buffer = ""
+    val_buffer = None 
     in_quotes = False
     attributes = {}
     attr_string = parts[1] if len(parts) > 1 else ""
     for c in attr_string:
         if c.isspace() and not in_quotes and key_buffer:
-            attributes[key_buffer.casefold()] = ""
+            val = "true"
+            if not val_buffer == None:
+                val = val_buffer
+                val_buffer = None 
+            attributes[key_buffer.casefold()] = val 
             key_buffer = ""
         elif c in ["'", '"'] and key_buffer:
             in_quotes = not in_quotes
             if not in_quotes:
-                attributes[key_buffer.casefold()] = val_buffer
+                attributes[key_buffer.casefold()] = val_buffer if val_buffer else ""
                 key_buffer = ""
-                val_buffer = ""
+            val_buffer = "" if in_quotes else None 
         elif in_quotes:
             val_buffer += c
-        elif not c.isspace() and c not in ["/", "="]:
-            key_buffer += c
+        elif c == "=":
+            val_buffer = ""
+        elif not c.isspace() and c not in ["/"]:
+            if val_buffer == None:
+                key_buffer += c
+            else:
+                val_buffer += c
+    if key_buffer:
+        val = "true"
+        if not val_buffer == None:
+            val = val_buffer
+            val_buffer = ""
+        attributes[key_buffer.casefold()] = val 
+ 
     return tag, attributes
 
 
