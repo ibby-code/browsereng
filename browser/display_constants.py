@@ -7,3 +7,5 @@ LEADING_FACTOR = 1.25
 INPUT_WIDTH_PX = 200
 
 POINTER_HOVER_TAG = "pointer_hover"
+CLEARABLE_CONTENT_TAG = "clearable"
+

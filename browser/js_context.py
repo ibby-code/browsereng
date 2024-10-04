@@ -1,4 +1,3 @@
-import browser
 import dukpy
 from css_parser import CSSParser, SelectorParsingException
 from enum import Enum
@@ -19,7 +18,7 @@ class JSEvent(Enum):
 
 
 class JSContext:
-    def __init__(self, tab: browser.Tab):
+    def __init__(self, tab):
         self.tab = tab
         self.node_to_handle: dict[Element, int] = {}
         self.handle_to_node: dict[int, Element] = {}
