@@ -128,7 +128,15 @@ class BlockLayout:
             block_nodes_buffer = []
             for child in self.node.children:
                 # hide the <head> tag
-                if isinstance(child, Element) and child.tag == "head":
+                if isinstance(child, Element) and (
+                    child.tag == "head"
+                    or (
+                        child.tag == "input"
+                        and child.attributes.get("type", "") == "hidden"
+                    )
+                    or child.attributes.get("hidden", None) != None
+                ):
+
                     continue
                 if is_inline_display(child):
                     block_nodes_buffer.append(child)
@@ -343,6 +351,9 @@ class InputLayout:
             cmds.append(DrawRect(rect, bgcolor, tags=tags))
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
+            type = self.node.attributes.get("type", "")
+            if type == "password":
+                text = "*" * len(text)
         elif self.node.tag == "button":
             if len(self.node.children) == 1 and \
                isinstance(self.node.children[0], Text):
