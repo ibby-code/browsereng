@@ -1,4 +1,5 @@
 use rand::random;
+use regex::{Captures, Regex};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -33,6 +34,19 @@ fn get_random_number() -> String {
     random::<usize>().to_string()[2..].to_string()
 }
 
+fn dumb_html_escape(val: &String) -> String {
+    let html_tag_start_regex = Regex::new(r"<(\w+)").unwrap();
+    let html_tag_end_regex = Regex::new(r"</(\w+)>").unwrap();
+    html_tag_end_regex
+        .replace(
+            &html_tag_start_regex
+                .replace(val, |caps: &Captures| format!("!!{}", &caps[1]))
+                .to_string(),
+            |caps: &Captures| format!("!!!{}", &caps[1]),
+        )
+        .to_string()
+}
+
 fn get_comments_html(
     session: &mut HashMap<String, String>,
     entries: &Vec<(String, String)>,
@@ -42,8 +56,8 @@ fn get_comments_html(
     for entry in entries {
         out.push_str(&format!(
             "<p>{entry} <i>by {user}</i></p>",
-            entry = entry.0,
-            user = entry.1
+            entry = dumb_html_escape(&entry.0),
+            user = dumb_html_escape(&entry.1)
         ));
     }
     let login_form_html = match session.get("user") {
@@ -332,6 +346,19 @@ pub fn run_server_at_port(port: usize) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_dumb_html_escape_text() {
+        assert_eq!(dumb_html_escape(&"hello, world".to_string()), "hello, world");
+    }
+
+    #[test]
+    fn test_dumb_html_escape_html() {
+        assert_eq!(
+            dumb_html_escape(&"<script>console.log(\"hi\");</script>".to_string()),
+            "!!script>console.log(\"hi\");!!!script"
+        );
+    }
 
     #[test]
     fn test_read_response_headers() {
