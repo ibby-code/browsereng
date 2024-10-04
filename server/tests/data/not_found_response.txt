@@ -1,0 +1,5 @@
+HTTP/1.0 404 Not Found
+Content-Length: 55
+Set-Cookie: token=__rand__; SameSite=Lax
+
+<html><body><h1>GET /list not found!</h1></body></html>

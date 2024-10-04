@@ -204,7 +204,7 @@ fn get_server_error_response(err: ServerError) -> String {
     response
 }
 
-fn read_response_headers(reader: &mut BufReader<&TcpStream>) -> HashMap<String, String> {
+fn read_response_headers<R: BufRead>(reader: &mut R) -> HashMap<String, String> {
     let mut header_map = HashMap::new();
     let mut line = String::new();
     loop {
@@ -256,7 +256,7 @@ fn handle_client(
         return Err(ServerError::UnsupportedMethod);
     }
     let header_map = read_response_headers(&mut reader);
-    println!("Good {header_map:?}", header_map=header_map);
+    println!("Good {header_map:?}", header_map = header_map);
     let mut body = String::new();
     let content_length_str = match header_map.get("content-length") {
         Some(c) => c,
@@ -293,7 +293,10 @@ fn handle_client(
         body_length = body.len()
     ));
     if header_map.get("cookie").is_none() {
-        response.push_str(&format!("Set-Cookie: token={token}; SameSite=Lax\r\n", token = token));
+        response.push_str(&format!(
+            "Set-Cookie: token={token}; SameSite=Lax\r\n",
+            token = token
+        ));
     }
     response.push_str("\r\n");
     response.push_str(&body);
@@ -305,7 +308,11 @@ fn handle_client(
 }
 
 pub fn run_server() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:8000")?;
+    run_server_at_port(8000)
+}
+
+pub fn run_server_at_port(port: usize) -> std::io::Result<()> {
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", port))?;
     let mut session_data = HashMap::new();
     let mut entries = Vec::new();
     entries.push((
@@ -320,4 +327,21 @@ pub fn run_server() -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_response_headers() {
+        let map = HashMap::from([
+            ("key".to_string(), "value".to_string()),
+            ("content-length".to_string(), "40".to_string()),
+            ("host".to_string(), "google.com".to_string()),
+        ]);
+        let headers = "Content-Length: 40\r\nHost:google.com\r\nKey:value\r\n\r\n".as_bytes();
+        let mut b = BufReader::new(headers);
+        assert_eq!(read_response_headers(&mut b), map);
+    }
 }
