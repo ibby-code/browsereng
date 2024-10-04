@@ -81,10 +81,10 @@ class JSContext:
 
     def XMLHttpRequest_send(self, method: str, url: str, body: str) -> str:
         full_url = self.tab.url.resolve(url)
-        if full_url.origin() != self.tab.origin():
-            raise Exception("Cross-origin XHR requests are not allowed")
+        if not self.tab.is_request_allowed(full_url):
+            raise Exception("Cross-origin XHR blocked by CSP")
         # do we cache this at some point?
-        response, _ = full_url.request(self.tab.url, body)
+        _, response, _ = full_url.request(self.tab.url, body)
         return response
 
     def get_handle(self, elt: Element) -> int:

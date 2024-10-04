@@ -81,6 +81,8 @@ fn get_comments_html(
     out.push_str(&login_form_html);
     out.push_str("<strong></strong>");
     out.push_str("<script src=\"/comment.js\"></script>");
+    // tests CSP on browser
+//    out.push_str("<script src=\"https://example.com/evil.js\"></script>");
     out.push_str("</body></html>");
     out
 }
@@ -312,6 +314,13 @@ fn handle_client(
             token = token
         ));
     }
+    match stream.local_addr() {
+        Ok(addr) => response.push_str(&format!(
+            "Content-Security-Policy: default-src http://localhost:{port}\r\n",
+            port = addr.port(),
+        )),
+        _ => (),
+    }
     response.push_str("\r\n");
     response.push_str(&body);
     println!("Writing response: {response}");
@@ -349,7 +358,10 @@ mod tests {
 
     #[test]
     fn test_dumb_html_escape_text() {
-        assert_eq!(dumb_html_escape(&"hello, world".to_string()), "hello, world");
+        assert_eq!(
+            dumb_html_escape(&"hello, world".to_string()),
+            "hello, world"
+        );
     }
 
     #[test]

@@ -480,6 +480,9 @@ class Tab:
     def has_forward_history(self) -> bool:
         return len(self.forward_history) > 0
 
+    def is_request_allowed(self, u: url.URL):
+        return not self.allowed_origins or u.origin() in self.allowed_origins
+
     def load_stylesheets(self, nodes_list: list[html_parser.Node]):
         links = [
             node.attributes["href"]
@@ -492,13 +495,16 @@ class Tab:
         rules = DEFAULT_STYLE_SHEET.copy()
         for link in links:
             style_url = self.url.resolve(link)
+            if not self.is_request_allowed(style_url):
+                print("Blocked stylesheet", link, "from loading due to CSP")
+                continue
             try:
                 cached_response = self.request_from_cache(style_url)
                 if cached_response:
-                    css, cache_time = cached_response
+                    headers, css, cache_time = cached_response
                 else:
-                    css, cache_time = style_url.request(self.url)
-                self.cache_request(style_url, css, cache_time)
+                    headers, css, cache_time = style_url.request(self.url)
+                    self.cache_request(style_url, headers, css, cache_time)
             except:
                 continue
             new_rules = CSSParser(css).parse()
@@ -517,13 +523,16 @@ class Tab:
         self.js = js_context.JSContext(self)
         for script in scripts:
             script_url = self.url.resolve(script)
+            if not self.is_request_allowed(script_url):
+                print("Blocked script", script, "from loading due to CSP")
+                continue
             try:
                 cached_response = self.request_from_cache(script_url)
                 if cached_response:
-                    js, cache_time = cached_response
+                    headers, js, cache_time = cached_response
                 else:
-                    js, cache_time = script_url.request(self.url)
-                self.cache_request(script_url, js, cache_time)
+                    headers, js, cache_time = script_url.request(self.url)
+                    self.cache_request(script_url, headers, js, cache_time)
             except:
                 continue
             self.js.run(script, js)
@@ -553,17 +562,24 @@ class Tab:
         skip_cache = load_action == LoadAction.FORM
         cache_response = None if skip_cache else self.request_from_cache(new_url)
         if cache_response:
-            body, cache_time = cache_response
+            headers, body, cache_time = cache_response
         else:
-            body, cache_time = new_url.request(self.url, payload)
+            headers, body, cache_time = new_url.request(self.url, payload)
             if not skip_cache:
-                self.cache_request(new_url, body, cache_time)
+                self.cache_request(new_url, headers, body, cache_time)
         self.url = new_url
         self.nodes = (
             layout.Text(None, body)
             if is_view_source
             else html_parser.HTMLParser(body).parse()
         )
+        self.allowed_origins = None
+        if "content-security-policy" in headers:
+            csp = headers["content-security-policy"].split()
+            if len(csp) > 0 and csp[0] == "default-src":
+                self.allowed_origins = []
+                for origin in csp[1:]:
+                    self.allowed_origins.append(url.URL({}, origin).origin())
         nodes_list = html_parser.tree_to_list(self.nodes, [])
         self.rules = self.load_stylesheets(nodes_list)
         self.load_javascript(nodes_list)
@@ -583,19 +599,19 @@ class Tab:
         paint_tree(self.document, self.display_list)
         # print(self.display_list)
 
-    def request_from_cache(self, url: url.URL) -> tuple[str, int] | None:
+    def request_from_cache(self, url: url.URL) -> tuple[str, int, dict[str, str]] | None:
         if url in self.cache:
-            content, store_time, max_age = self.cache[url]
+            headers, content, store_time, max_age = self.cache[url]
             print(f"retrieving at {store_time} with {max_age} at {time.time()}")
             if store_time + max_age > time.time():
-                return (content, 0)
+                return (content, 0, headers)
             else:
                 del self.cache[input]
 
-    def cache_request(self, url: url.URL, body: str, cache_time: int):
+    def cache_request(self, url: url.URL, headers: dict[str, str], body: str, cache_time: int):
         if cache_time > 0:
             print(f"storing at {time.time()} with {cache_time}")
-            self.cache[url] = (body, time.time(), cache_time)
+            self.cache[url] = (headers, body, time.time(), cache_time)
 
     def go_back(self):
         if len(self.backward_history) > 1:

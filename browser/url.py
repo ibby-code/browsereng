@@ -88,7 +88,7 @@ class URL:
         elif self.scheme == "data":
             return self.make_data_request()
 
-    def make_http_request(self, referer = None, payload=None, redirect=0) -> tuple[str, int]:
+    def make_http_request(self, referer = None, payload=None, redirect=0) -> tuple[dict[str, str], str, int]:
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -210,16 +210,16 @@ class URL:
                 elif directive.casefold() == "nostore":
                     cache_time = 0
                     break
-        return content, cache_time
+        return response_headers, content, cache_time
 
     def make_file_request(self):
         file = open(self.path, "r")
-        return file.read(), 0
+        return {}, file.read(), 0
 
     def make_data_request(self):
         # ex: full url "data:text/html,Hello World!"
         form, message = self.path.split(",", 1)
-        return message, 0
+        return {}, message, 0
 
     def can_use_same_socket(self, urlB):
         return (
