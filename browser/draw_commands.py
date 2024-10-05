@@ -1,6 +1,5 @@
 import skia
 from dataclasses import dataclass, field
-from PIL import ImageTk
 
 NAMED_COLORS = {
     "black": "#000000",
@@ -102,15 +101,15 @@ class DrawLine(DrawObject):
 
 
 @dataclass
-class DrawImage:
-    image: ImageTk.PhotoImage
+class DrawImage(DrawObject):
+    image: skia.Image 
+
+    def __post_init__(self):
+        pass
 
     def execute(self, scroll, canvas, tags=[]):
-        pass
-#        tags.extend(self.tags)
-#        canvas.create_image(
-#            self.left, self.top - scroll, anchor="nw", image=self.image, tags=tags
-#        )
+        tags.extend(self.tags)
+        canvas.drawImage(self.image, self.x1, self.y1 - scroll)
 
 
 @dataclass()

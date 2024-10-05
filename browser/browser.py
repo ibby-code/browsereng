@@ -18,7 +18,8 @@ DEFAULT_BROWSER_TITLE = "CanYouBrowseIt"
 BG_DEFAULT_COLOR = "white"
 DEFAULT_FILE = "file://testing/test.html"
 HOME_IMAGE = "img/home.png"
-HOME_IMAGE_SIZE = 24
+HOME_IMAGE_WIDTH = 24
+HOME_IMAGE_HEIGHT = 20
 
 
 class Focusable(Enum):
@@ -70,7 +71,7 @@ class Chrome:
             "y2": self.urlbar_bottom - self.padding,
         }
 
-        home_width = HOME_IMAGE_SIZE + 2 * self.padding
+        home_width = HOME_IMAGE_WIDTH + 2 * self.padding
         self.home_rect = {
             "x1": self.padding + self.forward_rect["x2"],
             "y1": self.urlbar_top + self.padding,
@@ -284,17 +285,17 @@ class Chrome:
         )
         # draw home button
         cmds.append(draw_commands.DrawOutline("black", 1, **self.home_rect,))
-        #self.image = load_home_image()
-        #height = self.home_rect["y2"] - self.home_rect["y1"]
-        #extra_space = height - self.image.height()
-        #h_padding = round(extra_space / 2)
-        #cmds.append(
-        #    draw_commands.DrawImage(
-        #        self.image,
-        #        x1=self.home_rect["x1"] + self.padding,
-        #        x2=self.home_rect["y1"] + h_padding,
-        #    )
-        #)
+        self.image = skia.Image.open(HOME_IMAGE).resize(HOME_IMAGE_WIDTH, HOME_IMAGE_HEIGHT)
+        height = self.home_rect["y2"] - self.home_rect["y1"]
+        extra_space = height - self.image.height()
+        h_padding = round(extra_space / 2)
+        cmds.append(
+            draw_commands.DrawImage(
+                self.image,
+                x1=self.home_rect["x1"] + self.padding,
+                y1=self.home_rect["y1"] + h_padding,
+            )
+        )
         # draw address bar
         cmds.append(draw_commands.DrawOutline("black", 1, **self.address_rect))
         url = str(self.browser.active_tab.url)
@@ -363,15 +364,7 @@ class Browser:
         self.sdl_window = sdl2.SDL_CreateWindow(DEFAULT_BROWSER_TITLE.encode(),
             sdl2.SDL_WINDOWPOS_CENTERED, sdl2.SDL_WINDOWPOS_CENTERED,
             WIDTH, HEIGHT, sdl2.SDL_WINDOW_SHOWN)
-        #
-        # self.canvas = tkinter.Canvas(
-        #     self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR
-        # )
-        # self.canvas.tag_bind(
-        #     POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1")
-        # )
-        # self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
-        # self.canvas.pack()
+        # TODO: Get cursor changing on hover for sdl:SDL_SetCursor()
         self.chrome = Chrome(self)
 
     def scroll_mouse(self, e):
@@ -451,7 +444,6 @@ class Browser:
         title = (
             self.active_tab.title if self.active_tab.title else DEFAULT_BROWSER_TITLE
         )
-       #self.window.title(title)
         canvas = self.root_surface.getCanvas()
         canvas.clear(skia.ColorWHITE)
         self.active_tab.draw(canvas, self.chrome.bottom)
@@ -469,6 +461,7 @@ class Browser:
             self.color_masks["BLUE_MASK"], self.color_masks["ALPHA_MASK"])
         rect = sdl2.SDL_Rect(0, 0, WIDTH, HEIGHT)
         window_surface = sdl2.SDL_GetWindowSurface(self.sdl_window)
+        sdl2.SDL_SetWindowTitle(self.sdl_window, title.encode())
         # SDL_BlitSurface is copying the values
         sdl2.SDL_BlitSurface(sdl_surface, rect, window_surface, rect)
         sdl2.SDL_UpdateWindowSurface(self.sdl_window)
@@ -476,13 +469,6 @@ class Browser:
 
     def handle_quit(self):
         sdl2.SDL_DestroyWindow(self.sdl_window)
-
-
-def load_home_image():
-    im = Image.open(HOME_IMAGE)
-    im.thumbnail((HOME_IMAGE_SIZE, HOME_IMAGE_SIZE), Image.Resampling.LANCZOS)
-    home_img = ImageTk.PhotoImage(im)
-    return home_img
 
 
 def contains_point(x: int, y: int, rect: dict[str, int]):
