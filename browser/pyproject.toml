@@ -7,4 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "dukpy>=0.4.0",
     "pillow>=10.4.0",
+    "pysdl2-dll>=2.30.2",
+    "pysdl2>=0.9.16",
+    "skia-python>=87.6",
 ]

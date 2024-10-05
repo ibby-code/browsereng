@@ -1,17 +1,16 @@
+import ctypes
 import draw_commands
 import layout
-import tkinter
-import tkinter.font
+import sdl2
+import skia
 import url
 from display_constants import (
-    CLEARABLE_CONTENT_TAG,
     HEIGHT,
     POINTER_HOVER_TAG,
     SCROLL_STEP,
     WIDTH,
 )
 from enum import Enum
-from functools import partial
 from PIL import ImageTk, Image
 from tab import Tab
 
@@ -39,8 +38,8 @@ class Event(Enum):
 class Chrome:
     def __init__(self, browser):
         self.browser = browser
-        self.font = layout.get_font("Arisl", 20, "normal", "roman")
-        self.font_height = self.font.metrics("linespace")
+        self.font = layout.get_font("Arial", 20, "normal", "roman")
+        self.font_height = draw_commands.get_font_linespace(self.font)
         self.padding = 5
         self.tabbar_top = 0
         self.tabbar_bottom = self.font_height + 2 * self.padding
@@ -48,64 +47,64 @@ class Chrome:
         self.urlbar_bottom = self.urlbar_top + self.font_height + 2 * self.padding
         self.bottom = self.urlbar_bottom
 
-        plus_width = self.font.measure("+") + 2 * self.padding
-        self.newtab_rect = draw_commands.Rect(
-            self.padding,
-            self.padding,
-            self.padding + plus_width,
-            self.padding + self.font_height,
-        )
+        plus_width = self.font.measureText("+") + 2 * self.padding
+        self.newtab_rect = {
+            "x1": self.padding,
+            "y1": self.padding,
+            "x2": self.padding + plus_width,
+            "y2": self.padding + self.font_height,
+        }
 
-        back_width = self.font.measure("<") + 2 * self.padding
-        self.back_rect = draw_commands.Rect(
-            self.padding,
-            self.urlbar_top + self.padding,
-            self.padding + back_width,
-            self.urlbar_bottom - self.padding,
-        )
-        forward_width = self.font.measure(">") + 2 * self.padding
-        self.forward_rect = draw_commands.Rect(
-            self.back_rect.right,
-            self.urlbar_top + self.padding,
-            self.back_rect.right + forward_width,
-            self.urlbar_bottom - self.padding,
-        )
+        back_width = self.font.measureText("<") + 2 * self.padding
+        self.back_rect = {
+            "x1": self.padding,
+            "y1": self.urlbar_top + self.padding,
+            "x2": self.padding + back_width,
+            "y2": self.urlbar_bottom - self.padding,
+        }
+        forward_width = self.font.measureText(">") + 2 * self.padding
+        self.forward_rect = {
+            "x1": self.back_rect["x2"],
+            "y1": self.urlbar_top + self.padding,
+            "x2": self.back_rect["x2"] + forward_width,
+            "y2": self.urlbar_bottom - self.padding,
+        }
 
         home_width = HOME_IMAGE_SIZE + 2 * self.padding
-        self.home_rect = draw_commands.Rect(
-            self.padding + self.forward_rect.right,
-            self.urlbar_top + self.padding,
-            self.padding + home_width + self.forward_rect.right,
-            self.urlbar_bottom - self.padding,
-        )
+        self.home_rect = {
+            "x1": self.padding + self.forward_rect["x2"],
+            "y1": self.urlbar_top + self.padding,
+            "x2": self.padding + home_width + self.forward_rect["x2"],
+            "y2": self.urlbar_bottom - self.padding,
+        }
 
-        self.address_rect = draw_commands.Rect(
-            self.padding + self.home_rect.right,
-            self.urlbar_top + self.padding,
-            WIDTH - self.padding,
-            self.urlbar_bottom - self.padding,
-        )
+        self.address_rect = {
+            "x1": self.padding + self.home_rect["x2"],
+            "y1": self.urlbar_top + self.padding,
+            "x2": WIDTH - self.padding,
+            "y2": self.urlbar_bottom - self.padding,
+        }
         self.focus = None
         self.address_bar_value = ""
         self.address_cursor_index = 0
 
     def click(self, x, y):
         self.focus = None
-        if self.newtab_rect.containsPoint(x, y):
+        if contains_point(x, y, self.newtab_rect):
             self.browser.new_tab(DEFAULT_FILE)
-        elif self.back_rect.containsPoint(x, y):
+        elif contains_point(x, y, self.back_rect):
             self.browser.active_tab.go_back()
-        elif self.forward_rect.containsPoint(x, y):
+        elif contains_point(x, y, self.forward_rect):
             self.browser.active_tab.go_forward()
-        elif self.home_rect.containsPoint(x, y):
+        elif contains_point(x, y, self.home_rect):
             self.browser.active_tab.load(DEFAULT_FILE)
-        elif self.address_rect.containsPoint(x, y):
+        elif contains_point(x, y, self.address_rect):
             self.focus = Focusable.ADDRESS_BAR
             self.address_bar_value = ""
             self.address_cursor_index = 0
         else:
             for i, tab in enumerate(self.browser.tabs):
-                if self.tab_rect(i).containsPoint(x, y):
+                if contains_point(x, y, self.tab_rect(i)):
                     self.browser.active_tab = tab
                     break
 
@@ -159,38 +158,36 @@ class Chrome:
         return False
 
     def tab_rect(self, i):
-        tabs_start = self.newtab_rect.right + self.padding
-        tab_width = self.font.measure("Tab X") + 2 * self.padding
-        return draw_commands.Rect(
-            tabs_start + tab_width * i,
-            self.tabbar_top,
-            tabs_start + tab_width * (i + 1),
-            self.tabbar_bottom,
-        )
+        tabs_start = self.newtab_rect["x2"] + self.padding
+        tab_width = self.font.measureText("Tab X") + 2 * self.padding
+        return {
+            "x1": tabs_start + tab_width * i,
+            "y1": self.tabbar_top,
+            "x2": tabs_start + tab_width * (i + 1),
+            "y2": self.tabbar_bottom,
+        }
 
     def paint(self):
         cmds = []
         # add background for chrome
         cmds.append(
-            draw_commands.DrawRect(
-                draw_commands.Rect(0, 0, WIDTH, self.bottom), "white"
-            )
+            draw_commands.DrawRect("white", x1=0, y1=0, x2=WIDTH, y2=self.bottom)
         )
         cmds.append(
             draw_commands.DrawLine(
-                draw_commands.Rect(0, self.bottom, WIDTH, self.bottom), "black", 1
+                 "black", 1,
+                x1=0, y1=self.bottom, x2=WIDTH, y2=self.bottom,
             )
         )
         # add new tab button
-        cmds.append(draw_commands.DrawOutline(self.newtab_rect, "black", 1))
+        cmds.append(draw_commands.DrawOutline("black", 1, **self.newtab_rect))
         cmds.append(
             draw_commands.DrawText(
-                self.newtab_rect.left + self.padding,
-                self.newtab_rect.top,
-                "+",
+               "+",
                 self.font,
                 "black",
-                tags=[POINTER_HOVER_TAG],
+                x1=self.newtab_rect["x1"] + self.padding,
+                y1=self.newtab_rect["y1"],
             )
         )
         # draw tabs
@@ -198,45 +195,59 @@ class Chrome:
             bounds = self.tab_rect(i)
             cmds.append(
                 draw_commands.DrawLine(
-                    draw_commands.Rect(bounds.left, 0, bounds.left, bounds.bottom),
-                    "black",
-                    1,
-                )
+                    "black", 1,
+                    **{
+                        "x1": bounds["x1"], 
+                        "y1": 0, 
+                        "x2": bounds["x1"], 
+                        "y2": bounds["y2"]
+                    }
+               )
             )
             cmds.append(
                 draw_commands.DrawLine(
-                    draw_commands.Rect(bounds.right, 0, bounds.right, bounds.bottom),
-                    "black",
-                    1,
+                    "black", 1,
+                    **{
+                        "x1": bounds["x2"], 
+                        "y1": 0, 
+                        "x2": bounds["x2"], 
+                        "y2": bounds["y2"]
+                    }
                 )
             )
             cmds.append(
                 draw_commands.DrawText(
-                    bounds.left + self.padding,
-                    bounds.top + self.padding,
-                    "Tab {}".format(i),
+                   "Tab {}".format(i),
                     self.font,
                     "black",
-                    tags=[POINTER_HOVER_TAG],
+                    x1=bounds["x1"] + self.padding,
+                    y1=bounds["y1"] + self.padding,
                 )
             )
             if tab == self.browser.active_tab:
                 cmds.append(
                     draw_commands.DrawLine(
-                        draw_commands.Rect(
-                            0, bounds.bottom, bounds.left, bounds.bottom
-                        ),
                         "black",
                         1,
+                        **{
+                            "x1": 0,
+                            "y1": bounds["y2"],
+                            "x2": bounds["x1"],
+                            "y2": bounds["y2"]
+                        }
+
                     )
                 )
                 cmds.append(
                     draw_commands.DrawLine(
-                        draw_commands.Rect(
-                            bounds.right, bounds.bottom, WIDTH, bounds.bottom
-                        ),
                         "black",
                         1,
+                        **{
+                            "x1": bounds["x2"],
+                            "y1": bounds["y2"],
+                            "x2": WIDTH,
+                            "y2": bounds["y2"]
+                        }
                     )
                 )
         # draw back button
@@ -245,15 +256,14 @@ class Chrome:
         if self.browser.active_tab.has_back_history():
             back_tags.append(POINTER_HOVER_TAG)
             back_color = "black"
-        cmds.append(draw_commands.DrawOutline(self.back_rect, back_color, 1))
+        cmds.append(draw_commands.DrawOutline(back_color, 1, **self.back_rect))
         cmds.append(
             draw_commands.DrawText(
-                self.back_rect.left + self.padding,
-                self.back_rect.top,
                 "<",
                 self.font,
                 back_color,
-                tags=back_tags,
+                x1=self.back_rect["x1"] + self.padding,
+                y1=self.back_rect["y1"],
             )
         )
         # draw forward button
@@ -262,65 +272,62 @@ class Chrome:
         if self.browser.active_tab.has_forward_history():
             forward_tags.append(POINTER_HOVER_TAG)
             forward_color = "black"
-        cmds.append(draw_commands.DrawOutline(self.forward_rect, forward_color, 1))
+        cmds.append(draw_commands.DrawOutline(forward_color, 1, **self.forward_rect))
         cmds.append(
             draw_commands.DrawText(
-                self.forward_rect.left + self.padding,
-                self.forward_rect.top,
-                ">",
+               ">",
                 self.font,
                 forward_color,
-                tags=forward_tags,
+                x1=self.forward_rect["x1"] + self.padding,
+                y1=self.forward_rect["y1"],
             )
         )
         # draw home button
-        cmds.append(draw_commands.DrawOutline(self.home_rect, "black", 1))
-        self.image = load_home_image()
-        height = self.home_rect.bottom - self.home_rect.top
-        extra_space = height - self.image.height()
-        h_padding = round(extra_space / 2)
-        cmds.append(
-            draw_commands.DrawImage(
-                self.home_rect.left + self.padding,
-                self.home_rect.top + h_padding,
-                self.image,
-                tags=[POINTER_HOVER_TAG],
-            )
-        )
+        cmds.append(draw_commands.DrawOutline("black", 1, **self.home_rect,))
+        #self.image = load_home_image()
+        #height = self.home_rect["y2"] - self.home_rect["y1"]
+        #extra_space = height - self.image.height()
+        #h_padding = round(extra_space / 2)
+        #cmds.append(
+        #    draw_commands.DrawImage(
+        #        self.image,
+        #        x1=self.home_rect["x1"] + self.padding,
+        #        x2=self.home_rect["y1"] + h_padding,
+        #    )
+        #)
         # draw address bar
-        cmds.append(draw_commands.DrawOutline(self.address_rect, "black", 1))
+        cmds.append(draw_commands.DrawOutline("black", 1, **self.address_rect))
         url = str(self.browser.active_tab.url)
         if self.focus == Focusable.ADDRESS_BAR:
             cmds.append(
                 draw_commands.DrawText(
-                    self.address_rect.left + self.padding,
-                    self.address_rect.top,
                     self.address_bar_value,
                     self.font,
                     "black",
+                    x1=self.address_rect["x1"] + self.padding,
+                    y1=self.address_rect["y1"],
                 )
             )
-            w = self.font.measure(self.address_bar_value[: self.address_cursor_index])
+            w = self.font.measureText(self.address_bar_value[: self.address_cursor_index])
             cmds.append(
                 draw_commands.DrawLine(
-                    draw_commands.Rect(
-                        self.address_rect.left + self.padding + w,
-                        self.address_rect.top,
-                        self.address_rect.left + self.padding + w,
-                        self.address_rect.bottom,
-                    ),
-                    "red",
-                    1,
+                    "red", 1,
+                    **{
+                        "x1": self.address_rect["x1"] + self.padding + w,
+                        "y1": self.address_rect["y1"],
+                        "x2": self.address_rect["x1"] + self.padding + w,
+                        "y2": self.address_rect["y2"],
+                    }
                 )
             )
         else:
             cmds.append(
                 draw_commands.DrawText(
-                    self.address_rect.left + self.padding,
-                    self.address_rect.top,
                     url,
                     self.font,
                     "black",
+                    x1=self.address_rect["x1"] + self.padding,
+                    y1=self.address_rect["y1"],
                 )
             )
         return cmds
@@ -332,27 +339,40 @@ class Browser:
         self.url_cache: dict[url.URL, (str, int, int)] = {}
         self.tabs: list[Tab] = []
         self.active_tab: Tab | None = None
-        self.window = tkinter.Tk()
-        self.window.title(DEFAULT_BROWSER_TITLE)
-        self.window.bind("<Key>", partial(self.handle_event, Event.KEY))
-        self.window.bind("<Return>", partial(self.handle_event, Event.ENTER))
-        self.window.bind("<BackSpace>", partial(self.handle_event, Event.BACKSPACE))
-        self.window.bind("<Right>", partial(self.handle_event, Event.RIGHT_ARROW))
-        self.window.bind("<Left>", partial(self.handle_event, Event.LEFT_ARROW))
-        self.window.bind("<Escape>", partial(self.handle_event, Event.ESCAPE))
-        self.window.bind("<Button-1>", self.click)
-        self.window.bind("<Down>", partial(self.scroll, SCROLL_STEP))
-        self.window.bind("<Up>", partial(self.scroll, -SCROLL_STEP))
-        self.window.bind("<MouseWheel>", self.scroll_mouse)
-        self.canvas = tkinter.Canvas(
-            self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR
+        if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
+            self.color_masks = {
+                "RED_MASK": 0xff000000,
+                "GREEN_MASK": 0x00ff0000,
+                "BLUE_MASK": 0x0000ff00,
+                "ALPHA_MASK": 0x000000ff,
+            }
+        else:
+            self.color_masks = {
+                "RED_MASK": 0x000000ff,
+                "GREEN_MASK": 0x0000ff00,
+                "BLUE_MASK": 0x00ff0000,
+                "ALPHA_MASK": 0xff000000,
+            }
+        self.root_surface = skia.Surface.MakeRaster(
+            skia.ImageInfo.Make(
+                WIDTH, HEIGHT,
+                ct=skia.kRGBA_8888_ColorType,
+                at=skia.kUnpremul_AlphaType
+            )
         )
-        self.canvas.tag_bind(
-            POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1")
-        )
-        self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
+        self.sdl_window = sdl2.SDL_CreateWindow(DEFAULT_BROWSER_TITLE.encode(),
+            sdl2.SDL_WINDOWPOS_CENTERED, sdl2.SDL_WINDOWPOS_CENTERED,
+            WIDTH, HEIGHT, sdl2.SDL_WINDOW_SHOWN)
+        #
+        # self.canvas = tkinter.Canvas(
+        #     self.window, width=WIDTH, height=HEIGHT, bg=BG_DEFAULT_COLOR
+        # )
+        # self.canvas.tag_bind(
+        #     POINTER_HOVER_TAG, "<Enter>", partial(self.set_cursor, "hand1")
+        # )
+        # self.canvas.tag_bind(POINTER_HOVER_TAG, "<Leave>", partial(self.set_cursor, ""))
+        # self.canvas.pack()
         self.chrome = Chrome(self)
-        self.canvas.pack()
 
     def scroll_mouse(self, e):
         delta = e.delta
@@ -364,11 +384,11 @@ class Browser:
             offset = SCROLL_STEP * delta
         self.scroll(offset, e)
 
-    def scroll(self, increment, e):
+    def scroll(self, increment: int, e: sdl2.SDL_Event):
         self.active_tab.scroll(increment)
         self.draw()
 
-    def click(self, e):
+    def click(self, e: sdl2.SDL_MouseButtonEvent):
         # being called for clicks on home button / entry bar
         if e.y < self.chrome.bottom:
             self.focus = None
@@ -381,7 +401,7 @@ class Browser:
             self.active_tab.click(e.x, tab_y)
         self.draw()
 
-    def handle_event(self, event: Event, e: tkinter.Event):
+    def handle_event(self, event: Event, e: sdl2.SDL_Event):
         should_draw = False
         match event:
             case Event.ENTER:
@@ -397,19 +417,21 @@ class Browser:
             case Event.ESCAPE:
                 should_draw = self.chrome.escape()
             case Event.KEY:
-                if len(e.char) == 0:
+                char = e.text.text.decode('utf8')
+                if len(char) == 0:
                     return
-                if not (0x20 <= ord(e.char) < 0x7F):
+                if not (0x20 <= ord(char) < 0x7F):
                     return
-                should_draw = self.chrome.keypress(e.char)
+                should_draw = self.chrome.keypress(char)
                 if not should_draw and self.focus == Focusable.CONTENT:
-                    should_draw = self.active_tab.keypress(e.char)
+                    should_draw = self.active_tab.keypress(char)
         if should_draw:
             self.draw()
 
     def set_cursor(self, cursor, e):
         # print("set cursor", cursor)
-        self.canvas.config(cursor=cursor)
+        pass
+        #self.canvas.config(cursor=cursor)
 
     def load_url(self, e=None):
         url_value = self.url_value.get()
@@ -426,15 +448,34 @@ class Browser:
         self.draw()
 
     def draw(self):
-        self.canvas.delete(CLEARABLE_CONTENT_TAG)
         title = (
             self.active_tab.title if self.active_tab.title else DEFAULT_BROWSER_TITLE
         )
-        self.window.title(title)
-        self.active_tab.draw(self.canvas, self.chrome.bottom)
-        # TODO: add tabs to clearable content
+       #self.window.title(title)
+        canvas = self.root_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+        self.active_tab.draw(canvas, self.chrome.bottom)
         for cmd in self.chrome.paint():
-            cmd.execute(0, self.canvas)
+            cmd.execute(0, canvas)
+
+        # take a snapshot of skia and pass it to sdl
+        depth = 32 # Bits per pixel
+        pitch = 4 * WIDTH # Bytes per row
+        skia_image = self.root_surface.makeImageSnapshot()
+        skia_bytes = skia_image.tobytes()
+        sdl_surface = sdl2.SDL_CreateRGBSurfaceFrom(
+            skia_bytes, WIDTH, HEIGHT, depth, pitch,
+            self.color_masks["RED_MASK"], self.color_masks["GREEN_MASK"],
+            self.color_masks["BLUE_MASK"], self.color_masks["ALPHA_MASK"])
+        rect = sdl2.SDL_Rect(0, 0, WIDTH, HEIGHT)
+        window_surface = sdl2.SDL_GetWindowSurface(self.sdl_window)
+        # SDL_BlitSurface is copying the values
+        sdl2.SDL_BlitSurface(sdl_surface, rect, window_surface, rect)
+        sdl2.SDL_UpdateWindowSurface(self.sdl_window)
+ 
+
+    def handle_quit(self):
+        sdl2.SDL_DestroyWindow(self.sdl_window)
 
 
 def load_home_image():
@@ -444,8 +485,46 @@ def load_home_image():
     return home_img
 
 
+def contains_point(x: int, y: int, rect: dict[str, int]):
+    return x >= rect["x1"] and x < rect["x2"] and y >= rect["y1"]and y < rect["y2"]
+
+
+def mainloop(browser: Browser):
+    event = sdl2.SDL_Event()
+    while True:
+        while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
+            match event.type:
+                case sdl2.SDL_QUIT:
+                    browser.handle_quit()
+                    sdl2.SDL_Quit()
+                    sys.exit()
+                case sdl2.SDL_MOUSEBUTTONUP:
+                    browser.click(event.button)
+                case sdl2.SDL_KEYDOWN:
+                    match event.key.keysym.sym:
+                        case sdl2.SDLK_RETURN:
+                            browser.handle_event(Event.ENTER, event)
+                        case sdl2.SDLK_DOWN:
+                            browser.scroll(SCROLL_STEP, event)
+                        case sdl2.SDLK_UP:
+                            browser.scroll(-SCROLL_STEP, event)
+                        case sdl2.SDLK_BACKSPACE:
+                            browser.handle_event(Event.BACKSPACE, event)
+                        case sdl2.SDLK_LEFT:
+                            browser.handle_event(Event.LEFT_ARROW, event)
+                        case sdl2.SDLK_RIGHT:
+                            browser.handle_event(Event.RIGHT_ARROW, event)
+                        case sdl2.SDLK_ESCAPE:
+                            browser.handle_event(Event.ESCAPE, event)
+                case sdl2.SDL_TEXTINPUT:
+                    browser.handle_event(Event.KEY, event)
+        
+        #self.window.bind("<Escape>", partial(self.handle_event, Event.ESCAPE))
+        #self.window.bind("<MouseWheel>", self.scroll_mouse)
+
 if __name__ == "__main__":
     import sys
+    sdl2.SDL_Init(sdl2.SDL_INIT_EVENTS)
 
     if not len(sys.argv) > 1:
         arg = DEFAULT_FILE
@@ -453,4 +532,4 @@ if __name__ == "__main__":
         arg = sys.argv[1]
     b = Browser()
     b.new_tab(arg)
-    tkinter.mainloop()
+    mainloop(b)

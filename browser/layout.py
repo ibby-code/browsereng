@@ -1,9 +1,9 @@
-import tkinter
 import re
+import skia
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
 from display_constants import HSTEP, INPUT_WIDTH_PX, LEADING_FACTOR, POINTER_HOVER_TAG, WIDTH 
-from draw_commands import DrawRect, Rect, DrawText, DrawOutline, DrawLine
+from draw_commands import DrawRect, DrawText, DrawOutline, DrawLine, get_font_linespace
 
 
 PIXEL_VALUE_REGEX = r"(\d+)px"
@@ -11,18 +11,23 @@ PIXEL_VALUE_REGEX = r"(\d+)px"
 FONT_CACHE = {}
 
 
-def get_font(font_family, size, weight, font_style):
+def get_font(font_family: str, size: int, weight: str, font_style: str) -> skia.Font:
     key = (font_family, size, weight, font_style)
     if key not in FONT_CACHE:
-        font = tkinter.font.Font(
-            family=key[0],
-            size=key[1],
-            weight=key[2],
-            slant=key[3],
-        )
-        label = tkinter.Label(font=font)
-        FONT_CACHE[key] = (font, label)
-    return FONT_CACHE[key][0]
+        if weight == "bold":
+            skia_weight = skia.FontStyle.kBold_Weight
+        else:
+            skia_weight = skia.FontStyle.kNormal_Weight
+        if font_style == "italic":
+            skia_style = skia.FontStyle.kItalic_Slant
+        else:
+            skia_style = skia.FontStyle.kUpright_Slant
+        skia_width = skia.FontStyle.kNormal_Width
+        style_info = \
+            skia.FontStyle(skia_weight, skia_width, skia_style)
+        font = skia.Typeface(font_family, style_info)
+        FONT_CACHE[key] = font
+    return skia.Font(FONT_CACHE[key], size)
 
 
 def is_inline_display(node: Node) -> bool:
@@ -87,7 +92,7 @@ class BlockLayout:
         bgcolor = self.node.style.get("background-color", "transparent")
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(Rect(self.x, self.y, x2, y2), bgcolor)
+            rect = DrawRect(bgcolor, x1=self.x, y1=self.y, x2=x2, y2=y2)
             cmds.append(rect)
         if self.layout_mode() == DisplayValue.INLINE:
             for node in self.children:
@@ -193,7 +198,7 @@ class BlockLayout:
             font_style = "roman"
         size = int(float(node.style["font-size"][:-2]) * 0.75)
         font = get_font(font_family, size, weight, font_style)
-        text_width = font.measure(word)
+        text_width = font.measureText(word)
 
         # if there is no horizontal space, write current line
         if self.cursor_x + text_width > self.width:
@@ -206,7 +211,7 @@ class BlockLayout:
         self.cursor_x += text_width
         # we should think about when to add a space
         if previous_word:
-            self.cursor_x += font.measure(" ")
+            self.cursor_x += font.measureText(" ")
     
     def input(self, node):
         w = INPUT_WIDTH_PX
@@ -226,7 +231,7 @@ class BlockLayout:
             font_style = "roman"
         size = int(float(node.style["font-size"][:-2]) * 0.75)
         font = get_font(font_family, size, weight, font_style)
-        self.cursor_x += w + font.measure(" ")
+        self.cursor_x += w + font.measureText(" ")
 
     def new_line(self):
         self.cursor_x = 0
@@ -264,9 +269,9 @@ class LineLayout:
         for word in self.children:
             word.layout()
 
-        font_metrics = [word.font.metrics() for word in self.children]
-        max_ascent = max([metric["ascent"] for metric in font_metrics])
-        max_descent = max([metric["descent"] for metric in font_metrics])
+        font_metrics = [word.font.getMetrics() for word in self.children]
+        max_ascent = max([-metric.fAscent for metric in font_metrics])
+        max_descent = max([metric.fDescent for metric in font_metrics])
         baseline = self.y + LEADING_FACTOR * max_ascent
         for word in self.children:
             vertical_align = word.node.style.get(
@@ -274,11 +279,11 @@ class LineLayout:
             )
             match vertical_align:
                 case VerticalAlign.BASELINE:
-                    word.y = baseline - word.font.metrics("ascent")
+                    word.y = baseline + word.font.getMetrics().fAscent
                 case VerticalAlign.SUPER:
                     word.y = baseline - max_ascent
                 case VerticalAlign.SUB:
-                    word.y = (baseline + max_descent) - word.font.metrics("linespace")
+                    word.y = (baseline + max_descent) - get_font_linespace(word.font)
         self.height = 1.25 * (max_ascent + max_descent)
 
 
@@ -302,7 +307,7 @@ class TextLayout:
         if cursor_style and cursor_style == "pointer":
             tags.append(POINTER_HOVER_TAG)
 
-        return [DrawText(self.x, self.y, self.word, self.font, color, tags=tags)]
+        return [DrawText(self.word, self.font, color, x1=self.x, y1=self.y)]
 
     def layout(self):
         weight = self.node.style["font-weight"]
@@ -315,16 +320,16 @@ class TextLayout:
         # assumes pixels
         size = int(float(self.node.style["font-size"][:-2]) * 0.75)
         self.font = get_font(font_family, size, weight, font_style)
-        self.width = self.font.measure(self.word)
+        self.width = self.font.measureText(self.word)
 
         # calculate word position
         if self.previous:
             # we should think about when to add a space
-            space = self.previous.font.measure(" ")
+            space = self.previous.font.measureText(" ")
             self.x = self.previous.x + space + self.previous.width
         else:
             self.x = self.parent.x
-        self.height = self.font.metrics("linespace")
+        self.height = get_font_linespace(self.font)
 
 class InputLayout:
     def __init__(self, node, parent, previous):
@@ -347,8 +352,8 @@ class InputLayout:
         bgcolor = self.node.style.get("background-color",
                                       "transparent")
         if bgcolor != "transparent":
-            rect = Rect(self.x, self.y, self.x + self.width, self.y + self.height)
-            cmds.append(DrawRect(rect, bgcolor, tags=tags))
+            cmds.append(DrawRect(
+                bgcolor, x1=self.x, y1=self.y, x2=self.x+self.width, y2=self.y + self.height))
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
             type = self.node.attributes.get("type", "")
@@ -363,13 +368,13 @@ class InputLayout:
                 text = ""
 
         # use outline in height and width calculations and conditionally add via css
-        cmds.append(DrawOutline(rect, 'black', 1, tags=tags))
+        cmds.append(DrawOutline('black', 1, x1=self.x, y1=self.y, x2=self.x+self.width, y2=self.y + self.height))
         if self.node.is_focused and self.node.tag == "input":
-            cx = self.x + self.font.measure(text)
+            cx = self.x + self.font.measureText(text)
             cmds.append(DrawLine(
-                Rect(cx, self.y, cx, self.y + self.height), "black", 1, tags=tags))
+                 "black", 1, x1=cx, y1=self.y, x2=cx, y2=self.y + self.height ))
         color = self.node.style["color"]
-        cmds.append(DrawText(self.x, self.y, text, self.font, color, tags=tags))
+        cmds.append(DrawText(text, self.font, color, x1=self.x, y1=self.y))
         return cmds
 
     def layout(self):
@@ -388,8 +393,8 @@ class InputLayout:
         # calculate word position
         if self.previous:
             # we should think about when to add a space
-            space = self.previous.font.measure(" ")
+            space = self.previous.font.measureText(" ")
             self.x = self.previous.x + space + self.previous.width
         else:
             self.x = self.parent.x
-        self.height = self.font.metrics("linespace")
+        self.height = get_font_linespace(self.font)

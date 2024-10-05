@@ -4,6 +4,7 @@ from unittest.mock import mock_open, call, patch, MagicMock
 
 FAKE_FILE = "\nHello\nWorld\n"
 HTTP_RESPONSE = "HTTP/1.0 200 OK\r\n" + "Header1: Value1\r\n\r\n" + "Body text"
+HTTP_RESPONSE_HEADERS = {"header1": "Value1"}
 
 RESOLVE_TEST_CASES = [
     {
@@ -97,13 +98,13 @@ class TestUrl(unittest.TestCase):
     def test_file(self, file):
         test_file = "C:/Users/user/Documents/txt.txt"
         u = url.URL({}, f"file://{test_file}")
-        self.assertEqual(u.request(), (FAKE_FILE, 0))
+        self.assertEqual(u.request(), ({}, FAKE_FILE, 0))
         file.assert_called_with(test_file, "r")
 
     def test_data(self):
         test_message = "hello world!"
         u = url.URL({}, f"data:text/html,{test_message}")
-        self.assertEqual(u.request(), (test_message, 0))
+        self.assertEqual(u.request(), ({}, test_message, 0))
 
     @patch("socket.socket")
     def test_http_get(self, mock_socket_ctr):
@@ -118,7 +119,7 @@ class TestUrl(unittest.TestCase):
 
         mock_socket.connect.assert_called_once_with(("google.com", 4229))
         mock_socket.send.assert_called_once_with(request.encode("utf-8"))
-        self.assertEqual(response, ("Body text", 0))
+        self.assertEqual(response, (HTTP_RESPONSE_HEADERS, "Body text", 0))
 
     @patch("socket.socket")
     def test_http_post(self, mock_socket_ctr):
@@ -176,7 +177,7 @@ class TestUrl(unittest.TestCase):
         u = url.URL({}, test_url)
         response = u.request()
 
-        self.assertEqual(response, ("Body", 0))
+        self.assertEqual(response, ({"content-length": "4"}, "Body", 0))
 
     @patch("socket.socket")
     def test_http_transfer_encoding_chunked(self, mock_socket_ctr):
@@ -195,7 +196,7 @@ class TestUrl(unittest.TestCase):
         u = url.URL({}, test_url)
 
         response = u.request()
-        self.assertEqual(response, ("birthday day", 0))
+        self.assertEqual(response, ({'transfer-encoding': 'chunked'}, "birthday day", 0))
 
     @patch("socket.socket")
     def test_http_transfer_encoding_chunked_with_content_type(
@@ -220,7 +221,10 @@ class TestUrl(unittest.TestCase):
         u = url.URL({}, test_url)
 
         response = u.request()
-        self.assertEqual(response, (first_chunk + second_chunk, 0))
+        self.assertEqual(response,
+                         ({"transfer-encoding":"chunked", "content-type": f"text/html; charset={charset}"},
+                          first_chunk + second_chunk,
+                          0))
     
     @patch("socket.socket")
     def test_http_transfer_encoding_chunked_with_content_type_fails(
@@ -274,7 +278,7 @@ class TestUrl(unittest.TestCase):
         response = u.request()
 
         mock_socket.connect.assert_called_once_with(("google.com", 443))
-        self.assertEqual(response, ("Body text", 0))
+        self.assertEqual(response, (HTTP_RESPONSE_HEADERS, "Body text", 0))
 
     @patch("socket.socket")
     def test_http_redirect(self, mock_socket_ctr):
@@ -292,7 +296,7 @@ class TestUrl(unittest.TestCase):
         mock_socket.send.assert_has_calls(
             [call(request_one.encode("utf-8")), call(request_two.encode("utf-8"))]
         )
-        self.assertEqual(response, ("Body text", 0))
+        self.assertEqual(response, (HTTP_RESPONSE_HEADERS, "Body text", 0))
 
     @patch("socket.socket")
     def test_http_redirect_new_socket(self, mock_socket_ctr):
@@ -307,7 +311,7 @@ class TestUrl(unittest.TestCase):
         mock_socket.connect.asset_has_calls(
             [call(("google.com", 80)), call(("google.com", 4229))]
         )
-        self.assertEqual(response, ("Body text", 0))
+        self.assertEqual(response, (HTTP_RESPONSE_HEADERS, "Body text", 0))
 
     @patch("socket.socket")
     def test_http_redirect_limit(self, mock_socket_ctr):
@@ -337,7 +341,7 @@ class TestUrl(unittest.TestCase):
         u = url.URL({}, test_url)
         response = u.request()
 
-        self.assertEqual(response, ("Body text", age))
+        self.assertEqual(response, ({"cache-control": f"max-age={age}"}, "Body text", age))
 
     @patch("socket.socket")
     def test_http_cache_nostore(self, mock_socket_ctr):
@@ -350,7 +354,7 @@ class TestUrl(unittest.TestCase):
         u = url.URL({}, test_url)
         response = u.request()
 
-        self.assertEqual(response, ("Body text", 0))
+        self.assertEqual(response, ({"cache-control": f"max-age=1024,nostore"}, "Body text", 0))
 
     @patch("socket.socket")
     def test_http_send_cookie(self, mock_socket_ctr):
