@@ -1,6 +1,7 @@
 HTTP/1.0 200 OK
 Content-Length: 266
 Set-Cookie: token=__rand__; SameSite=Lax
+Content-Security-Policy: default-src http://localhost:__rand__
 
 <html>
     <body>

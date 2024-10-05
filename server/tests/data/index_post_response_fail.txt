@@ -1,5 +1,6 @@
 HTTP/1.0 401 Unauthorized
 Content-Length: 80
 Set-Cookie: token=__rand__; SameSite=Lax
+Content-Security-Policy: default-src http://localhost:__rand__
 
 <html><body><h1>Invalid Login!</h1><a href="/login">Try again!</a></body></html>

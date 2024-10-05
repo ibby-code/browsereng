@@ -1,4 +1,5 @@
 HTTP/1.0 200 OK
 Content-Length:__rand__
+Content-Security-Policy: default-src http://localhost:__rand__
 
 <html><head><link rel="stylesheet" href="comment.css"/></head><body><p>Pavel was here <i>by crashoverride</i></p><p>new_guest <i>by crashoverride</i></p><h1>Hello, crashoverride</h1> <form action="add" method="post"> <p><input name="guest"></p> <p><button>Sign the book!</button></p> <input name="nonce" type="hidden" value="__rand__"> </form><strong></strong><script src="/comment.js"></script></body></html>

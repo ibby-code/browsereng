@@ -61,6 +61,11 @@ fn replace_token_value(response: String) -> (String, String) {
     )
 }
 
+fn replace_csp_port(response: String) -> String {
+    let csp_port_regex = Regex::new(r"default-src http://localhost:([\d]+)").unwrap();
+    csp_port_regex.replace(&response, format!("default-src http://localhost:{}", RANDOM_REPLACEMENT)).to_string()
+}
+
 fn write_and_read_stream_response(request: &str, port: Option<usize>) -> String {
     let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port.unwrap_or(8000))).unwrap();
     let _ = stream.write(request.as_bytes());
@@ -69,15 +74,7 @@ fn write_and_read_stream_response(request: &str, port: Option<usize>) -> String 
     BufReader::new(stream)
         .read_to_end(&mut response_bytes)
         .unwrap();
-    String::from_utf8(response_bytes).expect("Could not parse response")
-}
-
-fn read_stream_response(stream: &mut TcpStream) -> String {
-    let mut response_bytes = Vec::new();
-    BufReader::new(stream)
-        .read_to_end(&mut response_bytes)
-        .unwrap();
-    String::from_utf8(response_bytes).expect("Could not parse response")
+    replace_csp_port(String::from_utf8(response_bytes).expect("Could not parse response"))
 }
 
 // TODO: Don't use actual ports in integration tests! When running tests in parallel,
@@ -262,7 +259,8 @@ fn serve_get_js() {
     let request =
         "GET /comment.js HTTP/1.1\r\nHost: google.com\r\nUser-Agent: CanYouBrowseIt\r\n\r\n";
     let response = format!(
-        "HTTP/1.0 200 OK\r\nContent-Length: {content_length}\r\nSet-Cookie: token={fake_token}; SameSite=Lax\r\n\r\n{body}",
+        "HTTP/1.0 200 OK\r\nContent-Length: {content_length}\r\nSet-Cookie: token={fake_token}; SameSite=Lax\r\n\
+        Content-Security-Policy: default-src http://localhost:__rand__\r\n\r\n{body}",
         content_length=COMMENT_JS.len(),
         fake_token=RANDOM_REPLACEMENT,
         body=COMMENT_JS
@@ -280,7 +278,8 @@ fn serve_get_css() {
     let request =
         "GET /comment.css HTTP/1.1\r\nHost: google.com\r\nUser-Agent: CanYouBrowseIt\r\n\r\n";
     let response = format!(
-        "HTTP/1.0 200 OK\r\nContent-Length: {content_length}\r\nSet-Cookie: token={fake_token}; SameSite=Lax\r\n\r\n{body}",
+        "HTTP/1.0 200 OK\r\nContent-Length: {content_length}\r\nSet-Cookie: token={fake_token}; SameSite=Lax\r\n\
+        Content-Security-Policy: default-src http://localhost:__rand__\r\n\r\n{body}",
         content_length=COMMENT_CSS.len(),
         fake_token=RANDOM_REPLACEMENT,
         body=COMMENT_CSS
