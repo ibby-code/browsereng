@@ -367,15 +367,10 @@ class Browser:
         # TODO: Get cursor changing on hover for sdl:SDL_SetCursor()
         self.chrome = Chrome(self)
 
-    def scroll_mouse(self, e):
-        delta = e.delta
-        if delta % 120 == 0:
-            # windows uses multiples of 120
-            offset = SCROLL_STEP * (delta // 120)
-        else:
-            # mac uses multiples of 1
-            offset = SCROLL_STEP * delta
-        self.scroll(offset, e)
+    def scroll_mouse(self, e: sdl2.SDL_MouseWheelEvent):
+        delta = e.y
+        if delta:
+            self.scroll(delta * SCROLL_STEP, e)
 
     def scroll(self, increment: int, e: sdl2.SDL_Event):
         self.active_tab.scroll(increment)
@@ -465,7 +460,6 @@ class Browser:
         # SDL_BlitSurface is copying the values
         sdl2.SDL_BlitSurface(sdl_surface, rect, window_surface, rect)
         sdl2.SDL_UpdateWindowSurface(self.sdl_window)
- 
 
     def handle_quit(self):
         sdl2.SDL_DestroyWindow(self.sdl_window)
@@ -504,9 +498,9 @@ def mainloop(browser: Browser):
                             browser.handle_event(Event.ESCAPE, event)
                 case sdl2.SDL_TEXTINPUT:
                     browser.handle_event(Event.KEY, event)
+                case sdl2.SDL_MOUSEWHEEL:
+                    browser.scroll_mouse(event.wheel)
         
-        #self.window.bind("<Escape>", partial(self.handle_event, Event.ESCAPE))
-        #self.window.bind("<MouseWheel>", self.scroll_mouse)
 
 if __name__ == "__main__":
     import sys
