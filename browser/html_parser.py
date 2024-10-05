@@ -61,17 +61,14 @@ class Node:
         Checks whether children, styles are equal
         """
         if isinstance(other, Node):
-            return (
-                self.children == other.children
-                and all(
-                    [
-                        key in other.style and other.style[key] == value
-                        for key, value in self.style.items()
-                    ]
-                )
+            return self.children == other.children and all(
+                [
+                    key in other.style and other.style[key] == value
+                    for key, value in self.style.items()
+                ]
             )
         return False
-    
+
     def __repr__(self):
         return f"style:{repr(self.style)} children:{repr(self.children)}"
 
@@ -98,7 +95,9 @@ class Element(Node):
     is_focused = False
 
     def __repr__(self):
-        return f"<Element: {self.tag} {super().__repr__()} attr:{repr(self.attributes)}>"
+        return (
+            f"<Element: {self.tag} {super().__repr__()} attr:{repr(self.attributes)}>"
+        )
 
     def __eq__(self, other):
         is_eq = super().__eq__(other)
@@ -109,7 +108,7 @@ class Element(Node):
                     for key, value in self.attributes.items()
                 ]
             )
-        return False 
+        return False
 
     def __hash__(self):
         return hash((id(self)))
@@ -238,7 +237,7 @@ def get_tag_attributes(text: str) -> tuple[str, dict[str, str]]:
     parts = text.split(None, 1)
     tag = parts[0].casefold()
     key_buffer = ""
-    val_buffer = None 
+    val_buffer = None
     in_quotes = False
     attributes = {}
     attr_string = parts[1] if len(parts) > 1 else ""
@@ -247,15 +246,15 @@ def get_tag_attributes(text: str) -> tuple[str, dict[str, str]]:
             val = "true"
             if not val_buffer == None:
                 val = val_buffer
-                val_buffer = None 
-            attributes[key_buffer.casefold()] = val 
+                val_buffer = None
+            attributes[key_buffer.casefold()] = val
             key_buffer = ""
         elif c in ["'", '"'] and key_buffer:
             in_quotes = not in_quotes
             if not in_quotes:
                 attributes[key_buffer.casefold()] = val_buffer if val_buffer else ""
                 key_buffer = ""
-            val_buffer = "" if in_quotes else None 
+            val_buffer = "" if in_quotes else None
         elif in_quotes:
             val_buffer += c
         elif c == "=":
@@ -270,8 +269,8 @@ def get_tag_attributes(text: str) -> tuple[str, dict[str, str]]:
         if not val_buffer == None:
             val = val_buffer
             val_buffer = ""
-        attributes[key_buffer.casefold()] = val 
- 
+        attributes[key_buffer.casefold()] = val
+
     return tag, attributes
 
 

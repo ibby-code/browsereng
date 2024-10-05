@@ -102,7 +102,7 @@ class DrawLine(DrawObject):
 
 @dataclass
 class DrawImage(DrawObject):
-    image: skia.Image 
+    image: skia.Image
 
     def __post_init__(self):
         pass
@@ -115,7 +115,7 @@ class DrawImage(DrawObject):
 @dataclass()
 class DrawText(DrawObject):
     text: str
-    font: skia.Font 
+    font: skia.Font
     color: str
     bottom: int = field(init=False)
 

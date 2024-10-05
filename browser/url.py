@@ -31,7 +31,7 @@ class URL:
             self.host = ""
             self.port = 0
             self.path = url
-    
+
     def origin(self):
         return f"{self.scheme}://{self.host}:{self.port}"
 
@@ -79,7 +79,7 @@ class URL:
                 base += "/"
             return URL(self.cookie_jar, base + url)
 
-    def request(self, referer = None, payload=None):
+    def request(self, referer=None, payload=None):
         """Returns tuple with response and cache time"""
         if self.scheme in HTTP_SCHEMES:
             return self.make_http_request(referer, payload)
@@ -88,7 +88,9 @@ class URL:
         elif self.scheme == "data":
             return self.make_data_request()
 
-    def make_http_request(self, referer = None, payload=None, redirect=0) -> tuple[dict[str, str], str, int]:
+    def make_http_request(
+        self, referer=None, payload=None, redirect=0
+    ) -> tuple[dict[str, str], str, int]:
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -160,7 +162,11 @@ class URL:
 
         # fail unsupported headers
         assert "content-encoding" not in response_headers
-        assert response_headers["transfer-encoding"] == "chunked" if "transfer-encoding" in response_headers else True
+        assert (
+            response_headers["transfer-encoding"] == "chunked"
+            if "transfer-encoding" in response_headers
+            else True
+        )
 
         cookie = response_headers.get("set-cookie", None)
         if cookie:

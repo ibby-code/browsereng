@@ -2,7 +2,7 @@ import time
 import typing
 import urllib.parse
 from css_parser import CSSParser, Selector
-from display_constants import CLEARABLE_CONTENT_TAG, VSTEP, WIDTH 
+from display_constants import CLEARABLE_CONTENT_TAG, VSTEP, WIDTH
 from draw_commands import DrawRect
 from enum import Enum
 from html_parser import Element, Node, Text, HTMLParser, tree_to_list
@@ -170,7 +170,7 @@ class Tab:
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
-        #print(self.display_list)
+        # print(self.display_list)
 
     def request_from_cache(self, url: URL) -> tuple[str, int, dict[str, str]] | None:
         if url in self.cache:
@@ -201,7 +201,9 @@ class Tab:
             self.load(next, LoadAction.HISTORY)
 
     def draw(self, canvas, offset):
-        DrawRect("white", x1=0, y1=0, x2=WIDTH, y2=self.tab_height).execute(self.scroll_offset - offset, canvas)
+        DrawRect("white", x1=0, y1=0, x2=WIDTH, y2=self.tab_height).execute(
+            self.scroll_offset - offset, canvas
+        )
         for cmd in self.display_list:
             if cmd.rect.top() > self.scroll_offset + self.tab_height:
                 continue
@@ -383,8 +385,10 @@ def style(node: Node, rules: list[tuple[Selector, dict[str, str]]]):
     for child in node.children:
         style(child, rules)
 
+
 def create_error_html(exception: ConnectionError) -> str:
     return f"<html><body><h1>Page load error</h1><p>{exception}</p></body></html>"
+
 
 def cascade_priority(rule):
     selector, body = rule

@@ -176,15 +176,19 @@ class Chrome:
         )
         cmds.append(
             draw_commands.DrawLine(
-                 "black", 1,
-                x1=0, y1=self.bottom, x2=WIDTH, y2=self.bottom,
+                "black",
+                1,
+                x1=0,
+                y1=self.bottom,
+                x2=WIDTH,
+                y2=self.bottom,
             )
         )
         # add new tab button
         cmds.append(draw_commands.DrawOutline("black", 1, **self.newtab_rect))
         cmds.append(
             draw_commands.DrawText(
-               "+",
+                "+",
                 self.font,
                 "black",
                 x1=self.newtab_rect["x1"] + self.padding,
@@ -196,29 +200,31 @@ class Chrome:
             bounds = self.tab_rect(i)
             cmds.append(
                 draw_commands.DrawLine(
-                    "black", 1,
+                    "black",
+                    1,
                     **{
-                        "x1": bounds["x1"], 
-                        "y1": 0, 
-                        "x2": bounds["x1"], 
-                        "y2": bounds["y2"]
-                    }
-               )
+                        "x1": bounds["x1"],
+                        "y1": 0,
+                        "x2": bounds["x1"],
+                        "y2": bounds["y2"],
+                    },
+                )
             )
             cmds.append(
                 draw_commands.DrawLine(
-                    "black", 1,
+                    "black",
+                    1,
                     **{
-                        "x1": bounds["x2"], 
-                        "y1": 0, 
-                        "x2": bounds["x2"], 
-                        "y2": bounds["y2"]
-                    }
+                        "x1": bounds["x2"],
+                        "y1": 0,
+                        "x2": bounds["x2"],
+                        "y2": bounds["y2"],
+                    },
                 )
             )
             cmds.append(
                 draw_commands.DrawText(
-                   "Tab {}".format(i),
+                    "Tab {}".format(i),
                     self.font,
                     "black",
                     x1=bounds["x1"] + self.padding,
@@ -234,9 +240,8 @@ class Chrome:
                             "x1": 0,
                             "y1": bounds["y2"],
                             "x2": bounds["x1"],
-                            "y2": bounds["y2"]
-                        }
-
+                            "y2": bounds["y2"],
+                        },
                     )
                 )
                 cmds.append(
@@ -247,8 +252,8 @@ class Chrome:
                             "x1": bounds["x2"],
                             "y1": bounds["y2"],
                             "x2": WIDTH,
-                            "y2": bounds["y2"]
-                        }
+                            "y2": bounds["y2"],
+                        },
                     )
                 )
         # draw back button
@@ -276,7 +281,7 @@ class Chrome:
         cmds.append(draw_commands.DrawOutline(forward_color, 1, **self.forward_rect))
         cmds.append(
             draw_commands.DrawText(
-               ">",
+                ">",
                 self.font,
                 forward_color,
                 x1=self.forward_rect["x1"] + self.padding,
@@ -284,8 +289,16 @@ class Chrome:
             )
         )
         # draw home button
-        cmds.append(draw_commands.DrawOutline("black", 1, **self.home_rect,))
-        self.image = skia.Image.open(HOME_IMAGE).resize(HOME_IMAGE_WIDTH, HOME_IMAGE_HEIGHT)
+        cmds.append(
+            draw_commands.DrawOutline(
+                "black",
+                1,
+                **self.home_rect,
+            )
+        )
+        self.image = skia.Image.open(HOME_IMAGE).resize(
+            HOME_IMAGE_WIDTH, HOME_IMAGE_HEIGHT
+        )
         height = self.home_rect["y2"] - self.home_rect["y1"]
         extra_space = height - self.image.height()
         h_padding = round(extra_space / 2)
@@ -309,16 +322,19 @@ class Chrome:
                     y1=self.address_rect["y1"],
                 )
             )
-            w = self.font.measureText(self.address_bar_value[: self.address_cursor_index])
+            w = self.font.measureText(
+                self.address_bar_value[: self.address_cursor_index]
+            )
             cmds.append(
                 draw_commands.DrawLine(
-                    "red", 1,
+                    "red",
+                    1,
                     **{
                         "x1": self.address_rect["x1"] + self.padding + w,
                         "y1": self.address_rect["y1"],
                         "x2": self.address_rect["x1"] + self.padding + w,
                         "y2": self.address_rect["y2"],
-                    }
+                    },
                 )
             )
         else:
@@ -342,28 +358,31 @@ class Browser:
         self.active_tab: Tab | None = None
         if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
             self.color_masks = {
-                "RED_MASK": 0xff000000,
-                "GREEN_MASK": 0x00ff0000,
-                "BLUE_MASK": 0x0000ff00,
-                "ALPHA_MASK": 0x000000ff,
+                "RED_MASK": 0xFF000000,
+                "GREEN_MASK": 0x00FF0000,
+                "BLUE_MASK": 0x0000FF00,
+                "ALPHA_MASK": 0x000000FF,
             }
         else:
             self.color_masks = {
-                "RED_MASK": 0x000000ff,
-                "GREEN_MASK": 0x0000ff00,
-                "BLUE_MASK": 0x00ff0000,
-                "ALPHA_MASK": 0xff000000,
+                "RED_MASK": 0x000000FF,
+                "GREEN_MASK": 0x0000FF00,
+                "BLUE_MASK": 0x00FF0000,
+                "ALPHA_MASK": 0xFF000000,
             }
         self.root_surface = skia.Surface.MakeRaster(
             skia.ImageInfo.Make(
-                WIDTH, HEIGHT,
-                ct=skia.kRGBA_8888_ColorType,
-                at=skia.kUnpremul_AlphaType
+                WIDTH, HEIGHT, ct=skia.kRGBA_8888_ColorType, at=skia.kUnpremul_AlphaType
             )
         )
-        self.sdl_window = sdl2.SDL_CreateWindow(DEFAULT_BROWSER_TITLE.encode(),
-            sdl2.SDL_WINDOWPOS_CENTERED, sdl2.SDL_WINDOWPOS_CENTERED,
-            WIDTH, HEIGHT, sdl2.SDL_WINDOW_SHOWN)
+        self.sdl_window = sdl2.SDL_CreateWindow(
+            DEFAULT_BROWSER_TITLE.encode(),
+            sdl2.SDL_WINDOWPOS_CENTERED,
+            sdl2.SDL_WINDOWPOS_CENTERED,
+            WIDTH,
+            HEIGHT,
+            sdl2.SDL_WINDOW_SHOWN,
+        )
         # TODO: Get cursor changing on hover for sdl:SDL_SetCursor()
         self.chrome = Chrome(self)
 
@@ -405,7 +424,7 @@ class Browser:
             case Event.ESCAPE:
                 should_draw = self.chrome.escape()
             case Event.KEY:
-                char = e.text.text.decode('utf8')
+                char = e.text.text.decode("utf8")
                 if len(char) == 0:
                     return
                 if not (0x20 <= ord(char) < 0x7F):
@@ -419,7 +438,7 @@ class Browser:
     def set_cursor(self, cursor, e):
         # print("set cursor", cursor)
         pass
-        #self.canvas.config(cursor=cursor)
+        # self.canvas.config(cursor=cursor)
 
     def load_url(self, e=None):
         url_value = self.url_value.get()
@@ -446,14 +465,21 @@ class Browser:
             cmd.execute(0, canvas)
 
         # take a snapshot of skia and pass it to sdl
-        depth = 32 # Bits per pixel
-        pitch = 4 * WIDTH # Bytes per row
+        depth = 32  # Bits per pixel
+        pitch = 4 * WIDTH  # Bytes per row
         skia_image = self.root_surface.makeImageSnapshot()
         skia_bytes = skia_image.tobytes()
         sdl_surface = sdl2.SDL_CreateRGBSurfaceFrom(
-            skia_bytes, WIDTH, HEIGHT, depth, pitch,
-            self.color_masks["RED_MASK"], self.color_masks["GREEN_MASK"],
-            self.color_masks["BLUE_MASK"], self.color_masks["ALPHA_MASK"])
+            skia_bytes,
+            WIDTH,
+            HEIGHT,
+            depth,
+            pitch,
+            self.color_masks["RED_MASK"],
+            self.color_masks["GREEN_MASK"],
+            self.color_masks["BLUE_MASK"],
+            self.color_masks["ALPHA_MASK"],
+        )
         rect = sdl2.SDL_Rect(0, 0, WIDTH, HEIGHT)
         window_surface = sdl2.SDL_GetWindowSurface(self.sdl_window)
         sdl2.SDL_SetWindowTitle(self.sdl_window, title.encode())
@@ -466,7 +492,7 @@ class Browser:
 
 
 def contains_point(x: int, y: int, rect: dict[str, int]):
-    return x >= rect["x1"] and x < rect["x2"] and y >= rect["y1"]and y < rect["y2"]
+    return x >= rect["x1"] and x < rect["x2"] and y >= rect["y1"] and y < rect["y2"]
 
 
 def mainloop(browser: Browser):
@@ -500,10 +526,11 @@ def mainloop(browser: Browser):
                     browser.handle_event(Event.KEY, event)
                 case sdl2.SDL_MOUSEWHEEL:
                     browser.scroll_mouse(event.wheel)
-        
+
 
 if __name__ == "__main__":
     import sys
+
     sdl2.SDL_Init(sdl2.SDL_INIT_EVENTS)
 
     if not len(sys.argv) > 1:
