@@ -200,18 +200,10 @@ class Tab:
             next = self.forward_history.pop()
             self.load(next, LoadAction.HISTORY)
 
-    def draw(self, canvas, offset):
-        DrawRect("white", x1=0, y1=0, x2=WIDTH, y2=self.tab_height).execute(
-            self.scroll_offset - offset, canvas
-        )
+    def raster(self, canvas):
+        DrawRect("white", x1=0, y1=0, x2=WIDTH, y2=self.tab_height).execute(canvas)
         for cmd in self.display_list:
-            if cmd.rect.top() > self.scroll_offset + self.tab_height:
-                continue
-            if cmd.rect.bottom() < self.scroll_offset + VSTEP:
-                continue
-            cmd.execute(
-                self.scroll_offset - offset, canvas, tags=[CLEARABLE_CONTENT_TAG]
-            )
+            cmd.execute(canvas)
 
     def scroll_to_fragment(self, fragment: str, layout_list):
         print(f"scrolling to {fragment}")

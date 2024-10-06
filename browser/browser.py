@@ -1,5 +1,6 @@
 import ctypes
 import draw_commands
+import math
 import layout
 import sdl2
 import skia
@@ -9,6 +10,7 @@ from display_constants import (
     POINTER_HOVER_TAG,
     SCROLL_STEP,
     WIDTH,
+    VSTEP,
 )
 from enum import Enum
 from PIL import ImageTk, Image
@@ -89,16 +91,26 @@ class Chrome:
         self.address_bar_value = ""
         self.address_cursor_index = 0
 
-    def click(self, x, y):
+    def click(self, x: int, y: int) -> bool:
+        """
+        Clicks on the chrome.
+        
+        Returns:
+            bool: True to raster the tab (only chrome is raster'd by default)
+        """
         self.focus = None
         if contains_point(x, y, self.newtab_rect):
+            # new_tab already rasters the tab
             self.browser.new_tab(DEFAULT_FILE)
         elif contains_point(x, y, self.back_rect):
             self.browser.active_tab.go_back()
+            return True
         elif contains_point(x, y, self.forward_rect):
             self.browser.active_tab.go_forward()
+            return True
         elif contains_point(x, y, self.home_rect):
             self.browser.active_tab.load(DEFAULT_FILE)
+            return True
         elif contains_point(x, y, self.address_rect):
             self.focus = Focusable.ADDRESS_BAR
             self.address_bar_value = ""
@@ -107,7 +119,7 @@ class Chrome:
             for i, tab in enumerate(self.browser.tabs):
                 if contains_point(x, y, self.tab_rect(i)):
                     self.browser.active_tab = tab
-                    break
+                    return True
 
     def blur(self):
         self.focus = None
@@ -145,12 +157,18 @@ class Chrome:
             return True
         return False
 
-    def enter(self) -> bool:
+    def enter(self) -> tuple[bool, bool]:
+        """
+        Presses enter on the chrome
+
+        Returns:
+            tuple[bool, bool]: [should draw chrome, should draw tab]
+        """
         if self.focus == Focusable.ADDRESS_BAR:
             self.browser.active_tab.load(self.address_bar_value)
             self.focus = None
-            return True
-        return False
+            return True, True
+        return False, False
 
     def escape(self):
         if self.focus:
@@ -385,6 +403,8 @@ class Browser:
         )
         # TODO: Get cursor changing on hover for sdl:SDL_SetCursor()
         self.chrome = Chrome(self)
+        self.chrome_surface = skia.Surface(WIDTH, math.ceil(self.chrome.bottom))
+        self.tab_surface = None
 
     def scroll_mouse(self, e: sdl2.SDL_MouseWheelEvent):
         delta = e.y
@@ -393,6 +413,7 @@ class Browser:
 
     def scroll(self, increment: int, e: sdl2.SDL_Event):
         self.active_tab.scroll(increment)
+        self.raster_tab()
         self.draw()
 
     def click(self, e: sdl2.SDL_MouseButtonEvent):
@@ -400,39 +421,48 @@ class Browser:
         if e.y < self.chrome.bottom:
             self.focus = None
             self.active_tab.blur()
-            self.chrome.click(e.x, e.y)
+            should_raster_tab = self.chrome.click(e.x, e.y)
+            self.raster_chrome()
+            if should_raster_tab:
+                self.raster_tab()
         else:
             self.focus = Focusable.CONTENT
             self.chrome.blur()
             tab_y = e.y - self.chrome.bottom
             self.active_tab.click(e.x, tab_y)
+            self.raster_tab()
         self.draw()
 
     def handle_event(self, event: Event, e: sdl2.SDL_Event):
-        should_draw = False
+        should_draw_chrome = False
+        should_draw_tab = False
         match event:
             case Event.ENTER:
-                should_draw = self.chrome.enter()
-                if not should_draw and self.focus == Focusable.CONTENT:
-                    should_draw = self.active_tab.enter()
+                (should_draw_chrome, should_draw_tab) = self.chrome.enter()
+                if not should_draw_chrome and self.focus == Focusable.CONTENT:
+                    should_draw_tab = self.active_tab.enter()
             case Event.BACKSPACE:
-                should_draw = self.chrome.backspace()
-                if not should_draw and self.focus == Focusable.CONTENT:
-                    should_draw = self.active_tab.backspace()
+                should_draw_chrome = self.chrome.backspace()
+                if not should_draw_chrome and self.focus == Focusable.CONTENT:
+                    should_draw_tab = self.active_tab.backspace()
             case Event.LEFT_ARROW | Event.RIGHT_ARROW:
-                should_draw = self.chrome.arrow_key(event)
+                should_draw_chrome = self.chrome.arrow_key(event)
             case Event.ESCAPE:
-                should_draw = self.chrome.escape()
+                should_draw_chrome = self.chrome.escape()
             case Event.KEY:
                 char = e.text.text.decode("utf8")
                 if len(char) == 0:
                     return
                 if not (0x20 <= ord(char) < 0x7F):
                     return
-                should_draw = self.chrome.keypress(char)
-                if not should_draw and self.focus == Focusable.CONTENT:
-                    should_draw = self.active_tab.keypress(char)
-        if should_draw:
+                should_draw_chrome = self.chrome.keypress(char)
+                if not should_draw_chrome and self.focus == Focusable.CONTENT:
+                    should_draw_tab = self.active_tab.keypress(char)
+        if should_draw_chrome or should_draw_tab:
+            if should_draw_chrome:
+                self.raster_chrome()
+            if should_draw_tab:
+                self.raster_tab()
             self.draw()
 
     def set_cursor(self, cursor, e):
@@ -440,19 +470,28 @@ class Browser:
         pass
         # self.canvas.config(cursor=cursor)
 
-    def load_url(self, e=None):
-        url_value = self.url_value.get()
-        print(url_value)
-        if url_value:
-            self.active_tab.load(url_value)
-            self.draw()
-
     def new_tab(self, url):
         new_tab = Tab(self.cookie_jar, self.url_cache, HEIGHT - self.chrome.bottom)
         new_tab.load(url)
         self.active_tab = new_tab
         self.tabs.append(new_tab)
+        self.raster_chrome()
+        self.raster_tab()
         self.draw()
+    
+    def raster_tab(self):
+        tab_height = math.ceil(self.active_tab.document.height + 2 * VSTEP)
+        if not self.tab_surface or tab_height != self.tab_surface.height():
+            self.tab_surface = skia.Surface(WIDTH, tab_height)
+        canvas = self.tab_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+        self.active_tab.raster(canvas)
+    
+    def raster_chrome(self):
+        canvas = self.chrome_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+        for cmd in self.chrome.paint():
+            cmd.execute(canvas)
 
     def draw(self):
         title = (
@@ -460,10 +499,22 @@ class Browser:
         )
         canvas = self.root_surface.getCanvas()
         canvas.clear(skia.ColorWHITE)
-        self.active_tab.draw(canvas, self.chrome.bottom)
-        for cmd in self.chrome.paint():
-            cmd.execute(0, canvas)
 
+        tab_rect = skia.Rect.MakeLTRB(
+            0, self.chrome.bottom, WIDTH, HEIGHT)
+        tab_offset = self.chrome.bottom - self.active_tab.scroll_offset
+        canvas.save()
+        canvas.clipRect(tab_rect)
+        canvas.translate(0, tab_offset)
+        self.tab_surface.draw(canvas, 0, 0)
+        canvas.restore()
+
+        chrome_rect = skia.Rect.MakeLTRB(
+            0, 0, WIDTH, self.chrome.bottom)
+        canvas.save()
+        canvas.clipRect(chrome_rect)
+        self.chrome_surface.draw(canvas, 0, 0)
+        canvas.restore()
         # take a snapshot of skia and pass it to sdl
         depth = 32  # Bits per pixel
         pitch = 4 * WIDTH  # Bytes per row

@@ -57,7 +57,6 @@ class DrawObject:
     x2: int = field(kw_only=True, default=None)
     y1: int = field(kw_only=True, default=None)
     y2: int = field(kw_only=True, default=None)
-    tags: list[str] = field(kw_only=True, default_factory=list)
     rect: skia.Rect = field(init=False)
 
     def __post_init__(self):
@@ -69,14 +68,13 @@ class DrawOutline(DrawObject):
     color: str
     thickness: int
 
-    def execute(self, scroll, canvas, tags=[]):
-        tags.extend(self.tags)
+    def execute(self, canvas):
         paint = skia.Paint(
             Color=parse_color(self.color),
             StrokeWidth=self.thickness,
             Style=skia.Paint.kStroke_Style,
         )
-        canvas.drawRect(self.rect.makeOffset(0, -scroll), paint)
+        canvas.drawRect(self.rect, paint)
 
 
 @dataclass
@@ -84,13 +82,12 @@ class DrawLine(DrawObject):
     color: str
     thickness: int
 
-    def execute(self, scroll, canvas, tags=[]):
-        tags.extend(self.tags)
+    def execute(self, canvas):
         # this doesn't look right from the book, shouldn't scroll adjust y?
         path = (
             skia.Path()
-            .moveTo(self.x1, self.y1 - scroll)
-            .lineTo(self.x2, self.y2 - scroll)
+            .moveTo(self.x1, self.y1)
+            .lineTo(self.x2, self.y2)
         )
         paint = skia.Paint(
             Color=parse_color(self.color),
@@ -107,9 +104,8 @@ class DrawImage(DrawObject):
     def __post_init__(self):
         pass
 
-    def execute(self, scroll, canvas, tags=[]):
-        tags.extend(self.tags)
-        canvas.drawImage(self.image, self.x1, self.y1 - scroll)
+    def execute(self, canvas):
+        canvas.drawImage(self.image, self.x1, self.y1)
 
 
 @dataclass()
@@ -125,13 +121,12 @@ class DrawText(DrawObject):
             self.x1, self.y1, self.x1 + self.font.measureText(self.text), self.bottom
         )
 
-    def execute(self, scroll, canvas, tags=[]):
-        tags.extend(self.tags)
+    def execute(self, canvas):
         paint = skia.Paint(
             AntiAlias=True,
             Color=parse_color(self.color),
         )
-        baseline = self.y1 - scroll - self.font.getMetrics().fAscent
+        baseline = self.y1 - self.font.getMetrics().fAscent
         canvas.drawString(self.text, float(self.x1), baseline, self.font, paint)
 
 
@@ -139,10 +134,9 @@ class DrawText(DrawObject):
 class DrawRect(DrawObject):
     color: str
 
-    def execute(self, scroll, canvas, tags=[]):
-        tags.extend(self.tags)
+    def execute(self, canvas):
         paint = skia.Paint(Color=parse_color(self.color))
-        canvas.drawRect(self.rect.makeOffset(0, -scroll), paint)
+        canvas.drawRect(self.rect, paint)
 
 
 @dataclass()
@@ -155,7 +149,6 @@ class DrawRRect(DrawObject):
         super().__post_init__()
         self.rrect = skia.RRect.MakeRectXY(self.rect, self.radius, self.radius)
 
-    def execute(self, scroll, canvas, tags=[]):
-        tags.extend(self.tags)
+    def execute(self, canvas):
         paint = skia.Paint(Color=parse_color(self.color))
-        canvas.drawRRect(self.rrect.makeOffset(0, -scroll), paint)
+        canvas.drawRRect(self.rrect, paint)
