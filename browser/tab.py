@@ -2,7 +2,7 @@ import time
 import typing
 import urllib.parse
 from css_parser import CSSParser, Selector
-from display_constants import CLEARABLE_CONTENT_TAG, VSTEP, WIDTH
+from display_constants import DEFAULT_FONT_SIZE_PX, CLEARABLE_CONTENT_TAG, VSTEP, WIDTH
 from draw_commands import DrawRect
 from enum import Enum
 from html_parser import Element, Node, Text, HTMLParser, tree_to_list
@@ -15,7 +15,7 @@ VIEW_SOURCE = "view-source:"
 
 INHERITED_PROPERTIES = {
     "font-family": "Times",
-    "font-size": "16px",
+    "font-size": f"{DEFAULT_FONT_SIZE_PX}px",
     "font-style": "normal",
     "font-weight": "normal",
     "color": "black",

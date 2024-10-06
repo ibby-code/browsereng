@@ -7,12 +7,15 @@ html {
 
 }
 
-div > div {
-    width: 10px;
-}
-
 pre { font-size: 18px; overflow: auto; padding-left: 2ex; }
 
 .best-one {
     color: purple;
+}
+
+.narrow-bg-red {
+    color: white;
+    background-color: red;
+    border-radius: 8px;
+    width: 30px;
 }

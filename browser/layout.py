@@ -2,14 +2,31 @@ import re
 import skia
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
-from display_constants import HSTEP, INPUT_WIDTH_PX, LEADING_FACTOR, POINTER_HOVER_TAG, WIDTH 
-from draw_commands import DrawRect, DrawText, DrawOutline, DrawLine, get_font_linespace
+from display_constants import DEFAULT_FONT_SIZE_PX, HSTEP, INPUT_WIDTH_PX, LEADING_FACTOR, POINTER_HOVER_TAG, WIDTH 
+from draw_commands import DrawRect, DrawRRect, DrawText, DrawObject, DrawOutline, DrawLine, get_font_linespace
 
 
 PIXEL_VALUE_REGEX = r"(\d+)px"
 
 FONT_CACHE = {}
 
+def get_node_font(node: Node) -> skia.Font:
+    weight = node.style["font-weight"]
+    # only support family for now (not serif)
+    font_family = node.style["font-family"].split(",")[0].strip('"' + "'")
+    font_style = node.style["font-style"]
+    # baked in euro-centrism :-)
+    if font_style == "normal":
+        font_style = "roman"
+    # assumes pixels
+    try:
+        size = int(float(node.style["font-size"][:-2]) * 0.75)
+    except ValueError:
+        print("Unable to parse font size", node.style["font-size"])
+        size = DEFAULT_FONT_SIZE_PX 
+
+    return get_font(font_family, size, weight, font_style)
+ 
 
 def get_font(font_family: str, size: int, weight: str, font_style: str) -> skia.Font:
     key = (font_family, size, weight, font_style)
@@ -32,6 +49,20 @@ def get_font(font_family: str, size: int, weight: str, font_style: str) -> skia.
 
 def is_inline_display(node: Node) -> bool:
     return isinstance(node, Text) or node.style["display"] == DisplayValue.INLINE.value
+
+
+def draw_node_background(node: Node, x: int, width: int, y: int, height: int) -> list[DrawObject]:
+    cmds = []
+    bgcolor = node.style.get("background-color", "transparent")
+    if bgcolor != "transparent":
+        x2, y2 = x + width, y + height
+        try:
+            radius = float(node.style.get("border-radius", "0px")[:-2])
+        except ValueError:
+            radius = 0.0
+        rect = DrawRRect(bgcolor, radius, x1=x, y1=y, x2=x2, y2=y2)
+        cmds.append(rect)
+    return cmds
 
 
 class VerticalAlign(Enum):
@@ -89,11 +120,8 @@ class BlockLayout:
 
     def paint(self):
         cmds = []
-        bgcolor = self.node.style.get("background-color", "transparent")
-        if bgcolor != "transparent":
-            x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(bgcolor, x1=self.x, y1=self.y, x2=x2, y2=y2)
-            cmds.append(rect)
+        cmds.extend(draw_node_background(
+            self.node, self.x, self.width, self.y, self.height))
         if self.layout_mode() == DisplayValue.INLINE:
             for node in self.children:
                 cmds.extend(node.paint())
@@ -190,14 +218,7 @@ class BlockLayout:
                     self.recurse(child)
 
     def word(self, node, word):
-        weight = node.style["font-weight"]
-        # only support family for now (not serif)
-        font_family = node.style["font-family"].split(",")[0].strip('"' + "'")
-        font_style = node.style["font-style"]
-        if font_style == "normal":
-            font_style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * 0.75)
-        font = get_font(font_family, size, weight, font_style)
+        font = get_node_font(node)
         text_width = font.measureText(word)
 
         # if there is no horizontal space, write current line
@@ -223,14 +244,7 @@ class BlockLayout:
         input = InputLayout(node, line, previous_word)
         line.children.append(input)
  
-        weight = node.style["font-weight"]
-        # only support family for now (not serif)
-        font_family = node.style["font-family"].split(",")[0].strip('"' + "'")
-        font_style = node.style["font-style"]
-        if font_style == "normal":
-            font_style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * 0.75)
-        font = get_font(font_family, size, weight, font_style)
+        font = get_node_font(node)
         self.cursor_x += w + font.measureText(" ")
 
     def new_line(self):
@@ -310,16 +324,7 @@ class TextLayout:
         return [DrawText(self.word, self.font, color, x1=self.x, y1=self.y)]
 
     def layout(self):
-        weight = self.node.style["font-weight"]
-        # only support family for now (not serif)
-        font_family = self.node.style["font-family"].split(",")[0].strip('"' + "'")
-        font_style = self.node.style["font-style"]
-        # should prob use stylesheet for this
-        if font_style == "normal":
-            font_style = "roman"
-        # assumes pixels
-        size = int(float(self.node.style["font-size"][:-2]) * 0.75)
-        self.font = get_font(font_family, size, weight, font_style)
+        self.font = get_node_font(self.node)
         self.width = self.font.measureText(self.word)
 
         # calculate word position
@@ -345,15 +350,10 @@ class InputLayout:
 
     def paint(self):
         cmds = []
-        tags = []
-        cursor_style = self.node.style.get("cursor", None)
-        if cursor_style and cursor_style == "pointer":
-            tags.append(POINTER_HOVER_TAG)
-        bgcolor = self.node.style.get("background-color",
-                                      "transparent")
-        if bgcolor != "transparent":
-            cmds.append(DrawRect(
-                bgcolor, x1=self.x, y1=self.y, x2=self.x+self.width, y2=self.y + self.height))
+        # cursor_style = self.node.style.get("cursor", None)
+        # if cursor_style and cursor_style == "pointer":
+        cmds.extend(draw_node_background(
+            self.node, self.x, self.width, self.y, self.height))
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
             type = self.node.attributes.get("type", "")
@@ -366,9 +366,7 @@ class InputLayout:
             else:
                 print("Ignoring HTML contents inside button")
                 text = ""
-
-        # use outline in height and width calculations and conditionally add via css
-        cmds.append(DrawOutline('black', 1, x1=self.x, y1=self.y, x2=self.x+self.width, y2=self.y + self.height))
+        # support border style and use it by default for inputs
         if self.node.is_focused and self.node.tag == "input":
             cx = self.x + self.font.measureText(text)
             cmds.append(DrawLine(
@@ -378,16 +376,7 @@ class InputLayout:
         return cmds
 
     def layout(self):
-        weight = self.node.style["font-weight"]
-        # only support family for now (not serif)
-        font_family = self.node.style["font-family"].split(",")[0].strip('"' + "'")
-        font_style = self.node.style["font-style"]
-        # should prob use stylesheet for this
-        if font_style == "normal":
-            font_style = "roman"
-        # assumes pixels
-        size = int(float(self.node.style["font-size"][:-2]) * 0.75)
-        self.font = get_font(font_family, size, weight, font_style)
+        self.font = get_node_font(self.node)
         self.width = INPUT_WIDTH_PX
 
         # calculate word position

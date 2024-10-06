@@ -143,3 +143,19 @@ class DrawRect(DrawObject):
         tags.extend(self.tags)
         paint = skia.Paint(Color=parse_color(self.color))
         canvas.drawRect(self.rect.makeOffset(0, -scroll), paint)
+
+
+@dataclass()
+class DrawRRect(DrawObject):
+    color: str
+    radius: int
+    rrect: skia.RRect = field(init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.rrect = skia.RRect.MakeRectXY(self.rect, self.radius, self.radius)
+
+    def execute(self, scroll, canvas, tags=[]):
+        tags.extend(self.tags)
+        paint = skia.Paint(Color=parse_color(self.color))
+        canvas.drawRRect(self.rrect.makeOffset(0, -scroll), paint)
