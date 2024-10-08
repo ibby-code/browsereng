@@ -3,7 +3,7 @@ import skia
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
 from display_constants import DEFAULT_FONT_SIZE_PX, HSTEP, INPUT_WIDTH_PX, LEADING_FACTOR, POINTER_HOVER_TAG, WIDTH 
-from draw_commands import DrawRect, DrawRRect, DrawText, DrawObject, DrawOutline, DrawLine, get_font_linespace
+from draw_commands import DrawRect, DrawRRect, DrawText, DrawObject, DrawOutline, DrawLine, get_font_linespace, parse_color
 
 
 PIXEL_VALUE_REGEX = r"(\d+)px"
@@ -53,8 +53,18 @@ def is_inline_display(node: Node) -> bool:
 
 def draw_node_background(node: Node, x: int, width: int, y: int, height: int) -> list[DrawObject]:
     cmds = []
-    bgcolor = node.style.get("background-color", "transparent")
-    if bgcolor != "transparent":
+    background = node.style.get("background", None)
+    bgcolor = ""
+    if background:
+        # background-color should be in the final layer
+        color_values = [ value
+                    for value in background.split(",")[-1].split(" ")
+                    if parse_color(value, None)
+                  ]
+        bgcolor = color_values[-1] if len(color_values) else ""
+    if "background-color" in node.style:
+        bgcolor = node.style.get("background-color")
+    if bgcolor:
         x2, y2 = x + width, y + height
         try:
             radius = float(node.style.get("border-radius", "0px")[:-2])

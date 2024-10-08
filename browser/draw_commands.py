@@ -24,9 +24,15 @@ NAMED_COLORS = {
 }
 
 
-def parse_color(color: str) -> skia.Color:
+def parse_color(color: str, default: skia.Color = skia.ColorBLACK) -> skia.Color:
     if color.startswith("#"):
-        if len(color) == 7:
+        if len(color) == 9:
+            r = int(color[1:3], 16)
+            g = int(color[3:5], 16)
+            b = int(color[5:7], 16)
+            a = int(color[7:9], 16)
+            return skia.Color(r, g, b, a)
+        elif len(color) == 7:
             r = int(color[1:3], 16)
             g = int(color[3:5], 16)
             b = int(color[5:7], 16)
@@ -38,12 +44,12 @@ def parse_color(color: str) -> skia.Color:
             return skia.Color(r, g, b)
         else:
             print("could not parse color", color)
-            return skia.ColorBLACK
+            return default
     elif color in NAMED_COLORS:
         return parse_color(NAMED_COLORS[color])
     else:
         print("missing color", color)
-        return skia.ColorBLACK
+        return default
 
 
 def get_font_linespace(font: skia.Font) -> int:
