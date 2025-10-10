@@ -3,6 +3,7 @@ use regex::{Captures, Regex};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use url::form_urlencoded;
 
 const OK_RESPONSE: &str = "200 OK";
 const MISSING_RESPONSE: &str = "404 Not Found";
@@ -98,11 +99,12 @@ fn get_not_found_html(method: &str, url: &str) -> String {
 fn decode_form(body: String) -> HashMap<String, String> {
     let mut params = HashMap::new();
     for field in body.split("&") {
-        if let [name, value] = field.splitn(2, "=").collect::<Vec<&str>>()[..] {
-            // Need to use url decoding here
-            params.insert(name.to_owned(), value.to_owned());
-        } else {
-            println!("Failed to parse field {field}");
+        match form_urlencoded::parse(field.as_bytes()).into_owned().next() {
+            Some(pair) => {
+                params.insert(pair.0.to_string(), pair.1.to_string());
+                println!("Inserted comment {} by {}", pair.0, pair.1);
+            }
+            None => println!("Failed to parse field {field}"),
         }
     }
     params
