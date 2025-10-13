@@ -90,7 +90,8 @@ class URL:
 
     def make_http_request(
         self, referer=None, payload=None, redirect=0
-    ) -> tuple[dict[str, str], str, int]:
+    ) -> tuple[dict[str, str], str, int, bool]:
+        has_ssl = False;
         if not self.socket:
             self.socket = socket.socket(
                 family=socket.AF_INET,
@@ -100,8 +101,14 @@ class URL:
             if self.scheme == "https":
                 ctx = ssl.create_default_context()
                 self.socket = ctx.wrap_socket(self.socket, server_hostname=self.host)
-            # connect to url
-            self.socket.connect((self.host, self.port))
+                try:
+                    self.socket.connect((self.host, self.port))
+                    has_ssl = True
+                except ssl.SSLCertVerificationError as e:
+                    print(f'found cert error {str(e)}')
+            else:
+                self.socket.connect((self.host, self.port))
+                
         # create request
         method = "POST" if payload else "GET"
         request = f"{method} {self.path} HTTP/1.1\r\n"
@@ -158,6 +165,7 @@ class URL:
         elif status > 299 and status < 400 and redirect >= REDIRECT_LIMIT:
             raw_response.close()
             location = response_headers["location"]
+            # TODO: update this case to work correctly 
             return (f"Redirect loop detected! Last redirect is to :{location}", 0)
 
         # fail unsupported headers
@@ -216,16 +224,16 @@ class URL:
                 elif directive.casefold() == "nostore":
                     cache_time = 0
                     break
-        return response_headers, content, cache_time
+        return response_headers, content, cache_time, has_ssl
 
     def make_file_request(self):
         file = open(self.path, "r")
-        return {}, file.read(), 0
+        return {}, file.read(), 0, None
 
     def make_data_request(self):
         # ex: full url "data:text/html,Hello World!"
         form, message = self.path.split(",", 1)
-        return {}, message, 0
+        return {}, message, 0, None
 
     def can_use_same_socket(self, urlB):
         return (

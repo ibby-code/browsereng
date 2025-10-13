@@ -46,6 +46,7 @@ class Tab:
         self.url = None
         self.focus = None
         self.display_list = []
+        self.has_ssl = False
 
     def has_back_history(self) -> bool:
         return len(self.backward_history) > 1
@@ -122,6 +123,7 @@ class Tab:
         if load_action == LoadAction.NEW:
             self.forward_history = []
         self.scroll_offset = 0
+        self.has_ssl = False
         is_view_source = False
         if isinstance(input, str):
             link = input
@@ -138,7 +140,8 @@ class Tab:
             headers, body, cache_time = cache_response
         else:
             try:
-                headers, body, cache_time = new_url.request(self.url, payload)
+                headers, body, cache_time, has_ssl = new_url.request(self.url, payload)
+                self.has_ssl = has_ssl
                 if not skip_cache:
                     self.cache_request(new_url, headers, body, cache_time)
             except ConnectionError as e:

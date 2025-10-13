@@ -329,7 +329,8 @@ class Chrome:
         )
         # draw address bar
         cmds.append(draw_commands.DrawOutline("black", 1, **self.address_rect))
-        url = str(self.browser.active_tab.url)
+        has_ssl = self.browser.active_tab.has_ssl
+        # TODO: change this to show lock
         if self.focus == Focusable.ADDRESS_BAR:
             cmds.append(
                 draw_commands.DrawText(
@@ -358,7 +359,7 @@ class Chrome:
         else:
             cmds.append(
                 draw_commands.DrawText(
-                    url,
+                    ("\N{lock} " if has_ssl else "\N{open lock} ") + str(self.browser.active_tab.url),
                     self.font,
                     "black",
                     x1=self.address_rect["x1"] + self.padding,
@@ -429,7 +430,10 @@ class Browser:
             self.focus = Focusable.CONTENT
             self.chrome.blur()
             tab_y = e.y - self.chrome.bottom
+            url = self.active_tab.url
             self.active_tab.click(e.x, tab_y)
+            if self.active_tab.url != url:
+                self.raster_chrome()
             self.raster_tab()
         self.draw()
 
@@ -475,6 +479,7 @@ class Browser:
         new_tab.load(url)
         self.active_tab = new_tab
         self.tabs.append(new_tab)
+        self.chrome.address_bar_value = str(new_tab.url) 
         self.raster_chrome()
         self.raster_tab()
         self.draw()
