@@ -59,6 +59,8 @@ def parse_blend_mode(blend_mode_str):
             return skia.BlendMode.kDifference
         case "destination-in":
             return skia.BlendMode.kDstIn
+        case "source-over":
+            return skia.BlendMode.kSrcOver
         case _:
             return skia.BlendMode.kSrcOver
 
@@ -72,17 +74,17 @@ def paint_visual_effects(node, cmds, rect):
     overflow = node.style.get("overflow", "visible")
 
     if overflow == "clip":
+        if not blend_mode:
+            blend_mode = "source-over"
         border_radius = float(
             node.style.get("border-radius", "0px")[:-2])
-        cmds.append(Blend("destination-in", [
+        cmds.append(Blend(1.0, "destination-in", [
             DrawRRect("white", border_radius,
                       x1=rect.x1, x2=rect.x2, y1=rect.y1, y2=rect.y2)
         ]))
 
     return [
-        Blend(blend_mode, [
-            Opacity(opacity, cmds),
-        ]),
+        Blend(opacity, blend_mode, cmds),
     ]
 
 def paint_tree(layout_object, display_list):
@@ -199,35 +201,25 @@ class DrawRRect(DrawObject):
         canvas.drawRRect(self.rrect, paint)
 
 @dataclass()
-class Opacity:
-    opacity: int
-    children: list[DrawObject]
-
-    def __post_init__(self):
-        self.rect = skia.Rect.MakeEmpty()
-        for cmd in self.children:
-            self.rect.join(cmd.rect)
-    
-    def execute(self, canvas):
-        paint = skia.Paint(Alphaf=self.opacity)
-        canvas.saveLayer(None, paint)
-        for cmd in self.children:
-            cmd.execute(canvas)
-        canvas.restore()
-
-@dataclass()
 class Blend:
+    opacity: int
     blend_mode: str 
     children: list[DrawObject]
 
     def __post_init__(self):
         self.rect = skia.Rect.MakeEmpty()
+        self.should_save = self.opacity < 1 or self.blend_mode
         for cmd in self.children:
             self.rect.join(cmd.rect)
     
     def execute(self, canvas):
-        paint = skia.Paint(BlendMode=parse_blend_mode(self.blend_mode))
-        canvas.saveLayer(None, paint)
+        # avoid creating unnecessary layers
+        if self.should_save:
+            paint = skia.Paint(
+                Alphaf=self.opacity,
+                BlendMode=parse_blend_mode(self.blend_mode))
+            canvas.saveLayer(None, paint)
         for cmd in self.children:
             cmd.execute(canvas)
-        canvas.restore()
+        if self.should_save:
+            canvas.restore()
