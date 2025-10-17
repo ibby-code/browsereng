@@ -77,7 +77,7 @@ class JSContext:
         elt.children = new_nodes
         for child in elt.children:
             child.parent = elt
-        self.tab.render()
+        self.tab.set_needs_render()
 
     def value_get(self, handle: int) -> str:
         elt = self.handle_to_node[handle]

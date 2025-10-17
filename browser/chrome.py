@@ -72,9 +72,6 @@ class Chrome:
     def click(self, x: int, y: int) -> bool:
         """
         Clicks on the chrome.
-        
-        Returns:
-            bool: True to raster the tab (only chrome is raster'd by default)
         """
         self.focus = None
         if contains_point(x, y, self.newtab_rect):
@@ -82,13 +79,10 @@ class Chrome:
             self.browser.new_tab(DEFAULT_FILE)
         elif contains_point(x, y, self.back_rect):
             self.browser.active_tab.go_back()
-            return True
         elif contains_point(x, y, self.forward_rect):
             self.browser.active_tab.go_forward()
-            return True
         elif contains_point(x, y, self.home_rect):
             self.browser.active_tab.load(DEFAULT_FILE)
-            return True
         elif contains_point(x, y, self.address_rect):
             self.focus = Focusable.ADDRESS_BAR
             self.address_bar_value = ""
@@ -97,7 +91,6 @@ class Chrome:
             for i, tab in enumerate(self.browser.tabs):
                 if contains_point(x, y, self.tab_rect(i)):
                     self.browser.active_tab = tab
-                    return True
 
     def blur(self):
         self.focus = None

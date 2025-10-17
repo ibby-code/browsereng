@@ -2,6 +2,7 @@ import ctypes
 import math
 import sdl2
 import skia
+import threading
 import url
 from chrome import Chrome
 from display_constants import (
@@ -13,8 +14,10 @@ from display_constants import (
 )
 from event import (Focusable, Event)
 from tab import Tab
+from task import Task
 
 DEFAULT_BROWSER_TITLE = "CanYouBrowseIt"
+REFRESH_RATE_SEC = 0.033
 
 class Browser:
     def __init__(self):
@@ -22,6 +25,8 @@ class Browser:
         self.url_cache: dict[url.URL, (str, int, int)] = {}
         self.tabs: list[Tab] = []
         self.active_tab: Tab | None = None
+        self.animation_timer = None
+        self.needs_raster_and_draw = False
         if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
             self.color_masks = {
                 "RED_MASK": 0xFF000000,
@@ -54,6 +59,9 @@ class Browser:
         self.chrome_surface = skia.Surface(WIDTH, math.ceil(self.chrome.bottom))
         self.tab_surface = None
 
+    def set_needs_raster_and_draw(self):
+        self.needs_raster_and_draw = True
+
     def scroll_mouse(self, e: sdl2.SDL_MouseWheelEvent):
         delta = e.y
         if delta:
@@ -69,20 +77,13 @@ class Browser:
         if e.y < self.chrome.bottom:
             self.focus = None
             self.active_tab.blur()
-            should_raster_tab = self.chrome.click(e.x, e.y)
-            self.raster_chrome()
-            if should_raster_tab:
-                self.raster_tab()
+            self.chrome.click(e.x, e.y)
         else:
             self.focus = Focusable.CONTENT
             self.chrome.blur()
             tab_y = e.y - self.chrome.bottom
-            url = self.active_tab.url
             self.active_tab.click(e.x, tab_y)
-            if self.active_tab.url != url:
-                self.raster_chrome()
-            self.raster_tab()
-        self.draw()
+        self.set_needs_raster_and_draw()
 
     def handle_event(self, event: Event, e: sdl2.SDL_Event):
         should_draw_chrome = False
@@ -110,26 +111,38 @@ class Browser:
                 if not should_draw_chrome and self.focus == Focusable.CONTENT:
                     should_draw_tab = self.active_tab.keypress(char)
         if should_draw_chrome or should_draw_tab:
-            if should_draw_chrome:
-                self.raster_chrome()
-            if should_draw_tab:
-                self.raster_tab()
-            self.draw()
+            self.set_needs_raster_and_draw()
 
     def set_cursor(self, cursor, e):
         # print("set cursor", cursor)
         pass
         # self.canvas.config(cursor=cursor)
+    
+    def schedule_animation_frame(self):
+        def callback():
+            active_tab = self.active_tab
+            task = Task(active_tab.render)
+            active_tab.task_runner.schedule_task(task)
+            self.animation_timer = None
+        if not self.animation_timer:
+            self.animation_timer = threading.Timer(REFRESH_RATE_SEC, callback)
+            self.animation_timer.start()
+
+    def raster_and_draw(self):
+        if not self.needs_raster_and_draw:
+            return
+        self.raster_chrome()
+        self.raster_tab()
+        self.draw()
+        self.needs_raster_and_draw = False
 
     def new_tab(self, url):
-        new_tab = Tab(self.cookie_jar, self.url_cache, HEIGHT - self.chrome.bottom)
+        new_tab = Tab(self, self.cookie_jar, self.url_cache, HEIGHT - self.chrome.bottom)
         new_tab.load(url)
         self.active_tab = new_tab
         self.tabs.append(new_tab)
         self.chrome.address_bar_value = str(new_tab.url) 
-        self.raster_chrome()
-        self.raster_tab()
-        self.draw()
+        self.raster_and_draw()
     
     def raster_tab(self):
         tab_height = math.ceil(self.active_tab.document.height + 2 * VSTEP)
@@ -226,6 +239,8 @@ def mainloop(browser: Browser):
                 case sdl2.SDL_MOUSEWHEEL:
                     browser.scroll_mouse(event.wheel)
         browser.active_tab.task_runner.run()
+        browser.raster_and_draw()
+        browser.schedule_animation_frame()
 
 
 if __name__ == "__main__":

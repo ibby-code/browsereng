@@ -33,11 +33,13 @@ class LoadAction(Enum):
 class Tab:
     def __init__(
         self,
+        browser,
         cookie_jar: dict[str, str],
         cache: dict[URL, (str, int, int)],
         tab_height: int,
     ):
         self.task_runner = TaskRunner(self)
+        self.browser = browser
         self.cookie_jar = cookie_jar
         self.cache = cache
         self.title = ""
@@ -50,6 +52,7 @@ class Tab:
         self.js = None
         self.display_list = []
         self.has_ssl = False
+        self.needs_render = False
 
     def has_back_history(self) -> bool:
         return len(self.backward_history) > 1
@@ -59,6 +62,9 @@ class Tab:
 
     def is_request_allowed(self, u: URL):
         return not self.allowed_origins or u.origin() in self.allowed_origins
+    
+    def set_needs_render(self):
+        self.needs_render = True
 
     def load_stylesheets(self, nodes_list: list[Node]):
         links = [
@@ -170,15 +176,17 @@ class Tab:
             if isinstance(node, Element) and node.tag == "title"
         ]
         self.title = titles[0] if len(titles) else ""
-        self.render()
+        self.set_needs_render()
 
     def render(self):
+        if not self.needs_render: return
         style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
-        # print(self.display_list)
+        self.needs_render = False
+        self.browser.set_needs_raster_and_draw()
 
     def request_from_cache(self, url: URL) -> tuple[str, int, dict[str, str]] | None:
         if url in self.cache:
@@ -234,7 +242,7 @@ class Tab:
         if self.focus:
             self.focus.is_focused = False
             self.focus = None
-            self.render()
+            self.set_needs_render()
 
     def keypress(self, char):
         if self.focus:
@@ -242,7 +250,7 @@ class Tab:
                 return
             if self.focus.tag == "input":
                 self.focus.attributes["value"] += char
-                self.render()
+                self.set_needs_render()
                 return True
         return False
 
@@ -256,7 +264,7 @@ class Tab:
                 if not orig_value:
                     return False
                 self.focus.attributes["value"] = orig_value[:-1]
-                self.render()
+                self.set_needs_render()
                 return True
         return False
 
@@ -267,11 +275,12 @@ class Tab:
             if self.focus.tag == "input":
                 elt = self.try_submit_form_parent(self.focus)
                 if elt:
-                    self.render()
+                    self.set_needs_render()
                     return True
         return False
 
     def click(self, x, y):
+        self.render()
         # print("click ", x, y)
         y += self.scroll_offset
         # filter all objects that are at this spot
@@ -308,7 +317,7 @@ class Tab:
                     self.focus.is_focused = False
                 self.focus = elt
                 elt.is_focused = True
-                return self.render()
+                return self.set_needs_render()
             elif elt.tag == "button":
                 if self.js.dispatch_event(JSEvent.CLICK, elt):
                     return
