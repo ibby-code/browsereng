@@ -582,6 +582,7 @@ def mainloop(browser: Browser):
                     browser.handle_event(Event.KEY, event)
                 case sdl2.SDL_MOUSEWHEEL:
                     browser.scroll_mouse(event.wheel)
+        browser.active_tab.task_runner.run()
 
 
 if __name__ == "__main__":

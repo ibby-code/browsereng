@@ -8,6 +8,7 @@ from enum import Enum
 from html_parser import Element, Node, Text, HTMLParser, tree_to_list
 from layout import DocumentLayout
 from js_context import JSContext, JSEvent
+from task import TaskRunner, Task
 from url import URL
 
 DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
@@ -36,6 +37,7 @@ class Tab:
         cache: dict[URL, (str, int, int)],
         tab_height: int,
     ):
+        self.task_runner = TaskRunner(self)
         self.cookie_jar = cookie_jar
         self.cache = cache
         self.title = ""
@@ -109,7 +111,8 @@ class Tab:
                     self.cache_request(script_url, headers, js, cache_time)
             except:
                 continue
-            self.js.run(script, js)
+            task = Task(self.js.run, script, js)
+            self.task_runner.schedule_task(task)
 
     def load(
         self,
