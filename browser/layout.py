@@ -74,6 +74,10 @@ def draw_node_background(node: Node, x: int, width: int, y: int, height: int) ->
         cmds.append(rect)
     return cmds
 
+def get_rect(layout):
+    return DrawRect("", x1=layout.x, x2=layout.x + layout.width,
+                    y1=layout.y, y2=layout.y+layout.height)
+
 
 class VerticalAlign(Enum):
     BASELINE = "baseline"
@@ -110,7 +114,7 @@ class DocumentLayout:
         return True
 
     def paint_effects(self, cmds):
-        cmds = paint_visual_effects(self.node, cmds)
+        cmds = paint_visual_effects(self.node, cmds, get_rect(self))
         return cmds
 
     def paint(self):
@@ -133,7 +137,7 @@ class BlockLayout:
             (self.node.tag != "input" and self.node.tag != "button")
 
     def paint_effects(self, cmds):
-        cmds = paint_visual_effects(self.node, cmds)
+        cmds = paint_visual_effects(self.node, cmds, get_rect(self))
         return cmds
 
     def paint(self):
@@ -286,7 +290,7 @@ class LineLayout:
         return True
 
     def paint_effects(self, cmds):
-        cmds = paint_visual_effects(self.node, cmds)
+        cmds = paint_visual_effects(self.node, cmds, get_rect(self))
         return cmds
 
     def paint(self):
@@ -337,7 +341,7 @@ class TextLayout:
         return True
 
     def paint_effects(self, cmds):
-        cmds = paint_visual_effects(self.node, cmds)
+        cmds = paint_visual_effects(self.node, cmds, get_rect(self))
         return cmds
 
     def paint(self):
@@ -375,7 +379,7 @@ class InputLayout:
         return True
 
     def paint_effects(self, cmds):
-        cmds = paint_visual_effects(self.node, cmds)
+        cmds = paint_visual_effects(self.node, cmds, get_rect(self))
         return cmds
 
     def paint(self):

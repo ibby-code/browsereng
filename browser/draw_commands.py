@@ -57,6 +57,8 @@ def parse_blend_mode(blend_mode_str):
             return skia.BlendMode.kMultiply
         case "difference":
             return skia.BlendMode.kDifference
+        case "destination-in":
+            return skia.BlendMode.kDstIn
         case _:
             return skia.BlendMode.kSrcOver
 
@@ -64,9 +66,19 @@ def get_font_linespace(font: skia.Font) -> int:
     metrics = font.getMetrics()
     return metrics.fDescent - metrics.fAscent
 
-def paint_visual_effects(node, cmds):
+def paint_visual_effects(node, cmds, rect):
     opacity = float(node.style.get("opacity", "1.0"))
     blend_mode = node.style.get("mix-blend-mode")
+    overflow = node.style.get("overflow", "visible")
+
+    if overflow == "clip":
+        border_radius = float(
+            node.style.get("border-radius", "0px")[:-2])
+        cmds.append(Blend("destination-in", [
+            DrawRRect("white", border_radius,
+                      x1=rect.x1, x2=rect.x2, y1=rect.y1, y2=rect.y2)
+        ]))
+
     return [
         Blend(blend_mode, [
             Opacity(opacity, cmds),
