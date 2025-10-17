@@ -3,7 +3,7 @@ import skia
 from enum import Enum
 from html_parser import Node, Element, Text, create_anon_block
 from display_constants import DEFAULT_FONT_SIZE_PX, HSTEP, INPUT_WIDTH_PX, LEADING_FACTOR, POINTER_HOVER_TAG, WIDTH 
-from draw_commands import DrawRect, DrawRRect, DrawText, DrawObject, DrawOutline, DrawLine, get_font_linespace, parse_color
+from draw_commands import DrawRect, DrawRRect, DrawText, DrawObject, DrawOutline, DrawLine, get_font_linespace, parse_color, paint_visual_effects
 
 
 PIXEL_VALUE_REGEX = r"(\d+)px"
@@ -109,6 +109,10 @@ class DocumentLayout:
     def should_paint(self):
         return True
 
+    def paint_effects(self, cmds):
+        cmds = paint_visual_effects(self.node, cmds)
+        return cmds
+
     def paint(self):
         return []
 
@@ -127,6 +131,10 @@ class BlockLayout:
     def should_paint(self):
         return isinstance(self.node, Text) or \
             (self.node.tag != "input" and self.node.tag != "button")
+
+    def paint_effects(self, cmds):
+        cmds = paint_visual_effects(self.node, cmds)
+        return cmds
 
     def paint(self):
         cmds = []
@@ -277,6 +285,10 @@ class LineLayout:
     def should_paint(self):
         return True
 
+    def paint_effects(self, cmds):
+        cmds = paint_visual_effects(self.node, cmds)
+        return cmds
+
     def paint(self):
         return []
 
@@ -324,6 +336,10 @@ class TextLayout:
     def should_paint(self):
         return True
 
+    def paint_effects(self, cmds):
+        cmds = paint_visual_effects(self.node, cmds)
+        return cmds
+
     def paint(self):
         color = self.node.style["color"]
         tags = []
@@ -357,6 +373,10 @@ class InputLayout:
 
     def should_paint(self):
         return True
+
+    def paint_effects(self, cmds):
+        cmds = paint_visual_effects(self.node, cmds)
+        return cmds
 
     def paint(self):
         cmds = []

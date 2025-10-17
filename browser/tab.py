@@ -3,7 +3,7 @@ import typing
 import urllib.parse
 from css_parser import CSSParser, Selector
 from display_constants import DEFAULT_FONT_SIZE_PX, CLEARABLE_CONTENT_TAG, VSTEP, WIDTH
-from draw_commands import DrawRect
+from draw_commands import DrawRect, paint_tree
 from enum import Enum
 from html_parser import Element, Node, Text, HTMLParser, tree_to_list
 from layout import DocumentLayout
@@ -204,7 +204,6 @@ class Tab:
             self.load(next, LoadAction.HISTORY)
 
     def raster(self, canvas):
-        DrawRect("white", x1=0, y1=0, x2=WIDTH, y2=self.tab_height).execute(canvas)
         for cmd in self.display_list:
             cmd.execute(canvas)
 
@@ -389,10 +388,3 @@ def cascade_priority(rule):
     selector, body = rule
     return selector.priority
 
-
-def paint_tree(layout_object, display_list):
-    if layout_object.should_paint():
-        display_list.extend(layout_object.paint())
-
-    for child in layout_object.children:
-        paint_tree(child, display_list)

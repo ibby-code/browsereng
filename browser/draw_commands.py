@@ -51,11 +51,38 @@ def parse_color(color: str, default: skia.Color = skia.ColorBLACK) -> skia.Color
         print("missing color", color)
         return default
 
+def parse_blend_mode(blend_mode_str):
+    match blend_mode_str:
+        case "multiply":
+            return skia.BlendMode.kMultiply
+        case "difference":
+            return skia.BlendMode.kDifference
+        case _:
+            return skia.BlendMode.kSrcOver
 
 def get_font_linespace(font: skia.Font) -> int:
     metrics = font.getMetrics()
     return metrics.fDescent - metrics.fAscent
 
+def paint_visual_effects(node, cmds):
+    opacity = float(node.style.get("opacity", "1.0"))
+    blend_mode = node.style.get("mix-blend-mode")
+    return [
+        Blend(blend_mode, [
+            Opacity(opacity, cmds),
+        ]),
+    ]
+
+def paint_tree(layout_object, display_list):
+    cmds = []
+    if layout_object.should_paint():
+        cmds = layout_object.paint()
+    for child in layout_object.children:
+        paint_tree(child, cmds)
+    
+    if layout_object.should_paint():
+        cmds = layout_object.paint_effects(cmds)
+    display_list.extend(cmds)
 
 @dataclass
 class DrawObject:
@@ -158,3 +185,37 @@ class DrawRRect(DrawObject):
     def execute(self, canvas):
         paint = skia.Paint(Color=parse_color(self.color))
         canvas.drawRRect(self.rrect, paint)
+
+@dataclass()
+class Opacity:
+    opacity: int
+    children: list[DrawObject]
+
+    def __post_init__(self):
+        self.rect = skia.Rect.MakeEmpty()
+        for cmd in self.children:
+            self.rect.join(cmd.rect)
+    
+    def execute(self, canvas):
+        paint = skia.Paint(Alphaf=self.opacity)
+        canvas.saveLayer(None, paint)
+        for cmd in self.children:
+            cmd.execute(canvas)
+        canvas.restore()
+
+@dataclass()
+class Blend:
+    blend_mode: str 
+    children: list[DrawObject]
+
+    def __post_init__(self):
+        self.rect = skia.Rect.MakeEmpty()
+        for cmd in self.children:
+            self.rect.join(cmd.rect)
+    
+    def execute(self, canvas):
+        paint = skia.Paint(BlendMode=parse_blend_mode(self.blend_mode))
+        canvas.saveLayer(None, paint)
+        for cmd in self.children:
+            cmd.execute(canvas)
+        canvas.restore()
