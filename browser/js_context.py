@@ -13,6 +13,7 @@ EVENT_DISPATCH_JS = (
 )
 
 SETTIMEOUT_JS = "__runSetTimeout(dukpy.handle)"
+XHR_ONLOAD_JS = "__runXHROnload(dukpy.out, dukpy.handle)"
 
 class JSEvent(Enum):
     CLICK = "click"
@@ -83,13 +84,26 @@ class JSContext:
         if elt.tag == "input":
             return self.get_attribute(handle, "value")
 
-    def XMLHttpRequest_send(self, method: str, url: str, body: str) -> str:
+    def dispatch_xhr_onload(self, out, handle):
+        if self.discarded: return
+        self.interp.evaljs(XHR_ONLOAD_JS, out=out, handle=handle)
+
+    def XMLHttpRequest_send(self, method: str, url: str, body: str, is_async: bool, handle) -> str:
         full_url = self.tab.url.resolve(url)
         if not self.tab.is_request_allowed(full_url):
             raise Exception("Cross-origin XHR blocked by CSP")
+        if full_url.origin() != self.tab.url.origin():
+            raise Exception("Cross-origin XHR request not allowed")
         # do we cache this at some point?
-        _, response, _ = full_url.request(self.tab.url, body)
-        return response
+        def run_load():
+            _, response, _ = full_url.request(self.tab.url, body)
+            task = Task(self.dispatch_xhr_onload, response, handle)
+            self.tab.task_runner.schedule_task(task)
+            return response
+        if not is_async:
+            return run_load()
+        else:
+            threading.Thread(target=run_load).start()
     
     def dispatch_settimeout(self, handle):
         if self.discarded: return
