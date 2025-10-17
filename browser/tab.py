@@ -47,6 +47,7 @@ class Tab:
         self.scroll_offset = 0
         self.url = None
         self.focus = None
+        self.js = None
         self.display_list = []
         self.has_ssl = False
 
@@ -96,6 +97,7 @@ class Tab:
             and node.tag == "script"
             and "src" in node.attributes
         ]
+        if self.js: self.js.discarded = True
         self.js = JSContext(self)
         for script in scripts:
             script_url = self.url.resolve(script)

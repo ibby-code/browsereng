@@ -1,7 +1,9 @@
 import dukpy
+import threading
 from css_parser import CSSParser, SelectorParsingException
 from enum import Enum
 from html_parser import Element, HTMLParser, tree_to_list
+from task import Task
 
 RUNTIME_JS_FILE = "runtime.js"
 RUNTIME_JS = open(RUNTIME_JS_FILE).read()
@@ -10,6 +12,7 @@ EVENT_DISPATCH_JS = (
     "new Node(dukpy.handle).dispatchEvent(new Event(dukpy.type, dukpy.payload))"
 )
 
+SETTIMEOUT_JS = "__runSetTimeout(dukpy.handle)"
 
 class JSEvent(Enum):
     CLICK = "click"
@@ -20,6 +23,7 @@ class JSEvent(Enum):
 class JSContext:
     def __init__(self, tab):
         self.tab = tab
+        self.discarded = False
         self.node_to_handle: dict[Element, int] = {}
         self.handle_to_node: dict[int, Element] = {}
         self.interp = dukpy.JSInterpreter()
@@ -29,6 +33,7 @@ class JSContext:
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
         self.interp.export_function("value_get", self.value_get)
         self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
+        self.interp.export_function("setTimeout", self.setTimeout)
         self.run(RUNTIME_JS_FILE, RUNTIME_JS)
 
     def run(self, script: str, code: str):
@@ -85,6 +90,17 @@ class JSContext:
         # do we cache this at some point?
         _, response, _ = full_url.request(self.tab.url, body)
         return response
+    
+    def dispatch_settimeout(self, handle):
+        if self.discarded: return
+        self.interp.evaljs(SETTIMEOUT_JS, handle=handle)
+    
+    def setTimeout(self, handle, time):
+        def run_callback():
+            task = Task(self.dispatch_settimeout, handle)
+            self.tab.task_runner.schedule_task(task)
+        threading.Timer(time / 1000.0, run_callback).start()
+
 
     def get_handle(self, elt: Element) -> int:
         if elt not in self.node_to_handle:
