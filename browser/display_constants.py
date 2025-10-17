@@ -11,3 +11,5 @@ DEFAULT_FONT_SIZE_PX = 16
 POINTER_HOVER_TAG = "pointer_hover"
 CLEARABLE_CONTENT_TAG = "clearable"
 
+DEFAULT_FILE = "file://testing/test.html"
+
