@@ -65,6 +65,7 @@ class Tab:
     
     def set_needs_render(self):
         self.needs_render = True
+        self.browser.set_needs_animation_frame(self)
 
     def load_stylesheets(self, nodes_list: list[Node]):
         links = [
@@ -115,7 +116,7 @@ class Tab:
                 if cached_response:
                     headers, js, cache_time = cached_response
                 else:
-                    headers, js, cache_time = script_url.request(self.url)
+                    headers, js, cache_time, _ = script_url.request(self.url)
                     self.cache_request(script_url, headers, js, cache_time)
             except:
                 continue
@@ -180,6 +181,7 @@ class Tab:
 
     def render(self):
         if not self.needs_render: return
+        self.js.dispatch_request_animaton_frame_handlers()
         style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()

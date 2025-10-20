@@ -14,6 +14,7 @@ EVENT_DISPATCH_JS = (
 
 SETTIMEOUT_JS = "__runSetTimeout(dukpy.handle)"
 XHR_ONLOAD_JS = "__runXHROnload(dukpy.out, dukpy.handle)"
+RUN_RAF_HANLDERS_JS = "__runRAFHandlers()"
 
 class JSEvent(Enum):
     CLICK = "click"
@@ -34,7 +35,8 @@ class JSContext:
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
         self.interp.export_function("value_get", self.value_get)
         self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
-        self.interp.export_function("setTimeout", self.setTimeout)
+        self.interp.export_function("setTimeout", self.set_timeout)
+        self.interp.export_function("requestAnimationFrame", self.request_animation_frame)
         self.run(RUNTIME_JS_FILE, RUNTIME_JS)
 
     def run(self, script: str, code: str):
@@ -109,12 +111,17 @@ class JSContext:
         if self.discarded: return
         self.interp.evaljs(SETTIMEOUT_JS, handle=handle)
     
-    def setTimeout(self, handle, time):
+    def set_timeout(self, handle, time):
         def run_callback():
             task = Task(self.dispatch_settimeout, handle)
             self.tab.task_runner.schedule_task(task)
         threading.Timer(time / 1000.0, run_callback).start()
 
+    def dispatch_request_animaton_frame_handlers(self):
+        self.interp.evaljs(RUN_RAF_HANLDERS_JS)
+
+    def request_animation_frame(self):
+        self.tab.browser.set_needs_animation_frame(self.tab)
 
     def get_handle(self, elt: Element) -> int:
         if elt not in self.node_to_handle:

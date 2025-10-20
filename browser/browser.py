@@ -27,6 +27,7 @@ class Browser:
         self.active_tab: Tab | None = None
         self.animation_timer = None
         self.needs_raster_and_draw = False
+        self.needs_animation_frame = True 
         if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
             self.color_masks = {
                 "RED_MASK": 0xFF000000,
@@ -61,6 +62,10 @@ class Browser:
 
     def set_needs_raster_and_draw(self):
         self.needs_raster_and_draw = True
+
+    def set_needs_animation_frame(self, tab):
+        if tab == self.active_tab:
+            self.needs_animation_frame = True 
 
     def scroll_mouse(self, e: sdl2.SDL_MouseWheelEvent):
         delta = e.y
@@ -121,10 +126,14 @@ class Browser:
     def schedule_animation_frame(self):
         def callback():
             active_tab = self.active_tab
+            # make sure that this render actually renders
+            # scheduling a "needs_render" instead has an infinite loop
+            active_tab.needs_render = True
             task = Task(active_tab.render)
             active_tab.task_runner.schedule_task(task)
             self.animation_timer = None
-        if not self.animation_timer:
+        if self.needs_animation_frame and not self.animation_timer:
+            self.needs_animation_frame = False
             self.animation_timer = threading.Timer(REFRESH_RATE_SEC, callback)
             self.animation_timer.start()
 

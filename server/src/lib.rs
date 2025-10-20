@@ -16,6 +16,10 @@ const INVALID_LOGIN_HTML: &str =
     "<html><body><h1>Invalid Login!</h1><a href=\"/login\">Try again!</a></body></html>";
 const LOGIN_REQUIRED_HTML: &str =
     "<html><body><h1>You must be logged in to perform this action!</h1><a href=\"/login\">Sign in!</a></body></html>";
+const COUNT_HTML: &str =
+    "<html><div>Let's count up to 99!</div><div>Output</div>\
+    <script src=/counter.js></script>";
+const COUNTER_JS: &str = include_str!("counter.js");
 
 const MAX_ENTRY_LENGTH: usize = 10;
 
@@ -182,6 +186,10 @@ fn do_request(
         (OK_RESPONSE, String::from(COMMENT_JS))
     } else if method == "GET" && url == "/comment.css" {
         (OK_RESPONSE, String::from(COMMENT_CSS))
+    } else if method == "GET" && url == "/count" {
+        return (OK_RESPONSE, String::from(COUNT_HTML))
+    } else if method == "GET" && url == "/counter.js" {
+        return (OK_RESPONSE, String::from(COUNTER_JS))
     } else if method == "POST" && url == "/" {
         let params = decode_form(body);
         let logged_in = do_login(session, params);
