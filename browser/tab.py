@@ -120,8 +120,13 @@ class Tab:
                     self.cache_request(script_url, headers, js, cache_time)
             except:
                 continue
-            task = Task(self.js.run, script, js)
+            task = Task(self.load_js_run, script, js)
             self.task_runner.schedule_task(task)
+    
+    def load_js_run(self, script: str, js: str):
+        self.browser.measure.time(f"load js: {script}")
+        self.js.run(script, js)
+        self.browser.measure.stop(f"load js: {script}")
 
     def load(
         self,
@@ -181,6 +186,7 @@ class Tab:
 
     def render(self):
         if not self.needs_render: return
+        self.browser.measure.time('render')
         self.js.dispatch_request_animaton_frame_handlers()
         style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
@@ -189,6 +195,7 @@ class Tab:
         paint_tree(self.document, self.display_list)
         self.needs_render = False
         self.browser.set_needs_raster_and_draw()
+        self.browser.measure.stop('render')
 
     def request_from_cache(self, url: URL) -> tuple[str, int, dict[str, str]] | None:
         if url in self.cache:

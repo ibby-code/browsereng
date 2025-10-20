@@ -13,6 +13,7 @@ from display_constants import (
     VSTEP,
 )
 from event import (Focusable, Event)
+from measure_time import MeasureTime
 from tab import Tab
 from task import Task
 
@@ -55,6 +56,7 @@ class Browser:
             HEIGHT,
             sdl2.SDL_WINDOW_SHOWN,
         )
+        self.measure = MeasureTime()
         # TODO: Get cursor changing on hover for sdl:SDL_SetCursor()
         self.chrome = Chrome(self)
         self.chrome_surface = skia.Surface(WIDTH, math.ceil(self.chrome.bottom))
@@ -140,10 +142,12 @@ class Browser:
     def raster_and_draw(self):
         if not self.needs_raster_and_draw:
             return
+        self.measure.time('raster_and_draw')
         self.raster_chrome()
         self.raster_tab()
         self.draw()
         self.needs_raster_and_draw = False
+        self.measure.stop('raster_and_draw')
 
     def new_tab(self, url):
         new_tab = Tab(self, self.cookie_jar, self.url_cache, HEIGHT - self.chrome.bottom)
@@ -214,6 +218,7 @@ class Browser:
 
     def handle_quit(self):
         sdl2.SDL_DestroyWindow(self.sdl_window)
+        self.measure.finish()
 
 
 def mainloop(browser: Browser):

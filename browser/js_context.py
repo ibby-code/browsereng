@@ -88,7 +88,9 @@ class JSContext:
 
     def dispatch_xhr_onload(self, out, handle):
         if self.discarded: return
+        self.tab.browser.measure.time("RUN_XHR_ONLOAD_JS")
         self.interp.evaljs(XHR_ONLOAD_JS, out=out, handle=handle)
+        self.tab.browser.measure.stop("RUN_XHR_ONLOAD_JS")
 
     def XMLHttpRequest_send(self, method: str, url: str, body: str, is_async: bool, handle) -> str:
         full_url = self.tab.url.resolve(url)
@@ -109,7 +111,9 @@ class JSContext:
     
     def dispatch_settimeout(self, handle):
         if self.discarded: return
+        self.tab.browser.measure.time("SET_TIMEOUT_JS")
         self.interp.evaljs(SETTIMEOUT_JS, handle=handle)
+        self.tab.browser.measure.stop("SET_TIMEOUT_JS")
     
     def set_timeout(self, handle, time):
         def run_callback():
@@ -118,7 +122,9 @@ class JSContext:
         threading.Timer(time / 1000.0, run_callback).start()
 
     def dispatch_request_animaton_frame_handlers(self):
+        self.tab.browser.measure.time("RUN_RAF_HANDLERS_JS")
         self.interp.evaljs(RUN_RAF_HANLDERS_JS)
+        self.tab.browser.measure.stop("RUN_RAF_HANLDERS_JS")
 
     def request_animation_frame(self):
         self.tab.browser.set_needs_animation_frame(self.tab)
