@@ -3,11 +3,12 @@ import typing
 import urllib.parse
 from css_parser import CSSParser, Selector
 from display_constants import DEFAULT_FONT_SIZE_PX, CLEARABLE_CONTENT_TAG, VSTEP, WIDTH
-from draw_commands import DrawRect, paint_tree
+from draw_commands import paint_tree
 from enum import Enum
 from html_parser import Element, Node, Text, HTMLParser, tree_to_list
 from layout import DocumentLayout
 from js_context import JSContext, JSEvent
+from tab_commit_data import CommitData
 from task import TaskRunner, Task
 from url import URL
 
@@ -53,12 +54,6 @@ class Tab:
         self.display_list = []
         self.has_ssl = False
         self.needs_render = False
-
-    def has_back_history(self) -> bool:
-        return len(self.backward_history) > 1
-
-    def has_forward_history(self) -> bool:
-        return len(self.forward_history) > 0
 
     def is_request_allowed(self, u: URL):
         return not self.allowed_origins or u.origin() in self.allowed_origins
@@ -187,7 +182,6 @@ class Tab:
     def render(self):
         if not self.needs_render: return
         self.browser.measure.time('render')
-        self.js.dispatch_request_animaton_frame_handlers()
         style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
@@ -196,6 +190,26 @@ class Tab:
         self.needs_render = False
         self.browser.set_needs_raster_and_draw()
         self.browser.measure.stop('render')
+    
+    def run_animation_frame(self):
+        self.js.dispatch_request_animaton_frame_handlers()
+        # make sure that this render actually renders
+        # not in book but not sure how else this would happen
+        self.needs_render = True
+        self.render()
+
+        commit_data = CommitData(
+            self.url,
+            self.scroll,
+            self.tab_height,
+            self.display_list,
+            len(self.backward_history) > 1,
+            len(self.forward_history) > 0,
+            self.has_ssl, 
+            self.document.height
+        )
+        self.display_list = []
+        self.browser.commit(self, commit_data)
 
     def request_from_cache(self, url: URL) -> tuple[str, int, dict[str, str]] | None:
         if url in self.cache:
@@ -224,10 +238,6 @@ class Tab:
         if len(self.forward_history) > 0:
             next = self.forward_history.pop()
             self.load(next, LoadAction.HISTORY)
-
-    def raster(self, canvas):
-        for cmd in self.display_list:
-            cmd.execute(canvas)
 
     def scroll_to_fragment(self, fragment: str, layout_list):
         print(f"scrolling to {fragment}")

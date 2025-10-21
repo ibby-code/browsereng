@@ -7,6 +7,7 @@ from display_constants import (
     WIDTH,
 )
 from event import (Focusable, Event)
+from task import Task
 
 BG_DEFAULT_COLOR = "white"
 HOME_IMAGE = "img/home.png"
@@ -76,13 +77,15 @@ class Chrome:
         self.focus = None
         if contains_point(x, y, self.newtab_rect):
             # new_tab already rasters the tab
-            self.browser.new_tab(DEFAULT_FILE)
+            self.browser.new_tab_internal(DEFAULT_FILE)
         elif contains_point(x, y, self.back_rect):
-            self.browser.active_tab.go_back()
+            task = Task(self.browser.active_tab.go_back)
+            self.browser.active_tab.task_runner.schedule_task(task)
         elif contains_point(x, y, self.forward_rect):
-            self.browser.active_tab.go_forward()
+            task = Task(self.browser.active_tab.go_forward)
+            self.browser.active_tab.task_runner.schedule_task(task)
         elif contains_point(x, y, self.home_rect):
-            self.browser.active_tab.load(DEFAULT_FILE)
+            self.browser.schedule_load(DEFAULT_FILE)
         elif contains_point(x, y, self.address_rect):
             self.focus = Focusable.ADDRESS_BAR
             self.address_bar_value = ""
@@ -91,6 +94,7 @@ class Chrome:
             for i, tab in enumerate(self.browser.tabs):
                 if contains_point(x, y, self.tab_rect(i)):
                     self.browser.active_tab = tab
+                    return True
 
     def blur(self):
         self.focus = None
@@ -128,18 +132,18 @@ class Chrome:
             return True
         return False
 
-    def enter(self) -> tuple[bool, bool]:
+    def enter(self) -> bool:
         """
         Presses enter on the chrome
 
         Returns:
-            tuple[bool, bool]: [should draw chrome, should draw tab]
+            tuple[bool]: [should draw chrome]
         """
         if self.focus == Focusable.ADDRESS_BAR:
-            self.browser.active_tab.load(self.address_bar_value)
+            self.browser.schedule_load(self.address_bar_value)
             self.focus = None
-            return True, True
-        return False, False
+            return True
+        return False
 
     def escape(self):
         if self.focus:
@@ -248,7 +252,7 @@ class Chrome:
         # draw back button
         back_tags = []
         back_color = "grey"
-        if self.browser.active_tab.has_back_history():
+        if self.browser.active_tab_data.has_back_history:
             back_tags.append(POINTER_HOVER_TAG)
             back_color = "black"
         cmds.append(draw_commands.DrawOutline(back_color, 1, **self.back_rect))
@@ -264,7 +268,7 @@ class Chrome:
         # draw forward button
         forward_tags = []
         forward_color = "grey"
-        if self.browser.active_tab.has_forward_history():
+        if self.browser.active_tab_data.has_forward_history:
             forward_tags.append(POINTER_HOVER_TAG)
             forward_color = "black"
         cmds.append(draw_commands.DrawOutline(forward_color, 1, **self.forward_rect))
@@ -300,7 +304,7 @@ class Chrome:
         )
         # draw address bar
         cmds.append(draw_commands.DrawOutline("black", 1, **self.address_rect))
-        has_ssl = self.browser.active_tab.has_ssl
+        has_ssl = self.browser.active_tab_data.has_ssl
         # TODO: change this to show lock
         if self.focus == Focusable.ADDRESS_BAR:
             cmds.append(
@@ -330,7 +334,7 @@ class Chrome:
         else:
             cmds.append(
                 draw_commands.DrawText(
-                    ("\N{lock} " if has_ssl else "\N{open lock} ") + str(self.browser.active_tab.url),
+                    ("\N{lock} " if has_ssl else "\N{open lock} ") + str(self.browser.active_tab_data.url),
                     self.font,
                     "black",
                     x1=self.address_rect["x1"] + self.padding,
