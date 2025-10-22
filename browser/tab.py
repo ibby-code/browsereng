@@ -84,12 +84,12 @@ class Tab:
                 if cached_response:
                     headers, css, cache_time = cached_response
                 else:
-                    headers, css, cache_time = style_url.request(self.url)
+                    headers, css, cache_time, _ = style_url.request(self.url)
                     self.cache_request(style_url, headers, css, cache_time)
-            except:
+            except Exception as e:
+                print("Failed to load css url:", link, " -- ", e)
                 continue
             new_rules = CSSParser(css).parse()
-            # print(new_rules)
             rules.extend(new_rules)
         return rules
 
