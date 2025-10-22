@@ -19,3 +19,7 @@ pre { font-size: 18px; overflow: auto; padding-left: 2ex; }
     border-radius: 8px;
     width: 30px;
 }
+
+.animate-target {
+    font-size: 24px
+}

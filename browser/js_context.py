@@ -33,6 +33,7 @@ class JSContext:
         self.interp.export_function("querySelectorAll", self.query_selector_all)
         self.interp.export_function("getAttribute", self.get_attribute)
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
+        self.interp.export_function("style_set", self.style_set)
         self.interp.export_function("value_get", self.value_get)
         self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
         self.interp.export_function("setTimeout", self.set_timeout)
@@ -79,6 +80,11 @@ class JSContext:
         elt.children = new_nodes
         for child in elt.children:
             child.parent = elt
+        self.tab.set_needs_render()
+    
+    def style_set(self, handle: int, s: str):
+        elt = self.handle_to_node[handle]
+        elt.attributes["style"] = s
         self.tab.set_needs_render()
 
     def value_get(self, handle: int) -> str:

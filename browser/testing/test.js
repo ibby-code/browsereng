@@ -20,3 +20,26 @@ var inputs = document.querySelectorAll("input");
 for (var i = 0; i < inputs.length; i++) {
     inputs[i].addEventListener("keydown", handleKeyDown);
 }
+
+var animEl = document.querySelectorAll(".animate-target")[0];
+var totalFrames  = 120;
+var currentFrame = 0;
+var changePerFrame = (0.999 - 0.1) / totalFrames;
+function animate() {
+  currentFrame++;
+  var newOpacity =  currentFrame * changePerFrame + 0.1;
+  animEl.style = "opacity: " + (1 - newOpacity);
+  return currentFrame < totalFrames;
+}
+
+function handleAnimateButtonClick(evt) {
+  console.log("animate clicked!")
+  function runAnimationFrame() {
+    if (animate()) {
+      requestAnimationFrame(runAnimationFrame)
+    }
+  }
+  requestAnimationFrame(runAnimationFrame);
+}
+var animButtonEl = document.querySelectorAll(".animate-button")[0];
+animButtonEl.addEventListener("click", handleAnimateButtonClick)

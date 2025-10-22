@@ -62,6 +62,12 @@ Object.defineProperty(Node.prototype, 'value', {
     }
 });
 
+Object.defineProperty(Node.prototype, 'style', {
+    set: function(s) {
+        call_python("style_set", this.handle, s.toString())
+    }
+})
+
 Node.prototype.getAttribute = function(attr) {
     return call_python("getAttribute", this.handle, attr);
 }
