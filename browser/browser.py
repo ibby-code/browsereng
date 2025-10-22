@@ -19,6 +19,9 @@ from tab_commit_data import CommitData
 from task import Task
 
 DEFAULT_BROWSER_TITLE = "CanYouBrowseIt"
+DEFAULT_COMMIT_DATA = CommitData(
+    "", 0, 0, [], False, False, False
+)
 REFRESH_RATE_SEC = 0.033
 
 class Browser:
@@ -65,30 +68,34 @@ class Browser:
         self.lock = threading.Lock()
         threading.current_thread().name = "Browser thread"
 
-        self.active_tab_data: CommitData = CommitData(
-            "", 0, 0, [], False, False, False, 0
-        )
+        self.active_tab_data: CommitData = DEFAULT_COMMIT_DATA 
+        self.active_tab_scroll = 0
 
     def set_needs_raster_and_draw(self):
-        self.lock.acquire(blocking=True)
-        self.needs_raster_and_draw = True
-        self.lock.release()
+        with self.lock:
+            self.needs_raster_and_draw = True
 
     def set_needs_animation_frame(self, tab):
-        self.lock.acquire(blocking=True)
-        if tab == self.active_tab:
-            self.needs_animation_frame = True 
-        self.lock.release()
+        with self.lock:
+            if tab == self.active_tab:
+                self.needs_animation_frame = True 
         
     def commit(self, tab: Tab, data: CommitData):
         self.lock.acquire(blocking=True)
         if tab == self.active_tab:
             self.active_tab_data = data
+            if data.scroll != None:
+                self.active_tab_scroll = data.scroll
             self.animation_timer = None
             self.lock.release()
             self.set_needs_raster_and_draw()
         else:
             self.lock.release()
+
+    def clamp_scroll(self, scroll):
+        height = self.active_tab_data.document_height
+        maxscroll = height - (HEIGHT - self.chrome.bottom)
+        return max(0, min(scroll, maxscroll))
 
     def scroll_mouse(self, e: sdl2.SDL_MouseWheelEvent):
         delta = e.y
@@ -96,12 +103,14 @@ class Browser:
             self.scroll(delta * SCROLL_STEP, e)
 
     def scroll(self, increment: int, e: sdl2.SDL_Event):
-        self.lock.acquire(blocking=True)
-        task = Task(self.active_tab.scroll, increment)
-        self.active_tab.task_runner.schedule_task(task)
-        self.raster_tab()
-        self.draw()
-        self.lock.release()
+        with self.lock:
+            if not self.active_tab_data.document_height:
+                return
+            self.active_tab_scroll = self.clamp_scroll(
+                self.active_tab_scroll + increment
+            )
+            self.needs_animation_frame = True
+        self.set_needs_raster_and_draw()
 
     def click(self, e: sdl2.SDL_MouseButtonEvent):
         # being called for clicks on home button / entry bar
@@ -164,18 +173,15 @@ class Browser:
     
     def schedule_animation_frame(self):
         def callback():
-            self.lock.acquire(blocking=True)
-            active_tab = self.active_tab
-            task = Task(active_tab.run_animation_frame)
-            active_tab.task_runner.schedule_task(task)
-            self.animation_timer = None
-            self.lock.release()
-        self.lock.acquire(blocking=True)
-        if self.needs_animation_frame and not self.animation_timer:
-            self.needs_animation_frame = False
-            self.animation_timer = threading.Timer(REFRESH_RATE_SEC, callback)
-            self.animation_timer.start()
-        self.lock.release()
+            with self.lock:
+                self.needs_animation_frame = False
+                task = Task(self.active_tab.run_animation_frame, self.active_tab_scroll)
+                self.active_tab.task_runner.schedule_task(task)
+                self.animation_timer = None
+        with self.lock:
+            if self.needs_animation_frame and not self.animation_timer:
+                self.animation_timer = threading.Timer(REFRESH_RATE_SEC, callback)
+                self.animation_timer.start()
 
     def schedule_load(self, url, body=None):
         self.active_tab.task_runner.clear_pending_tasks()
@@ -190,10 +196,17 @@ class Browser:
     def new_tab_internal(self, url):
         new_tab = Tab(self, self.cookie_jar, self.url_cache, HEIGHT - self.chrome.bottom)
         new_tab.task_runner.start_thread()
-        self.active_tab = new_tab
+        self.set_active_tab(new_tab)
         self.tabs.append(new_tab)
         self.chrome.address_bar_value = str(new_tab.url) 
         self.schedule_load(url)
+    
+    def set_active_tab(self, tab):
+        self.active_tab = tab
+        self.active_tab_scroll = 0
+        self.active_tab_data = DEFAULT_COMMIT_DATA
+        self.needs_animation_frame = True
+        self.animation_timer = None
     
     def raster_and_draw(self):
         self.lock.acquire(blocking=True)

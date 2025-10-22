@@ -93,7 +93,7 @@ class Chrome:
         else:
             for i, tab in enumerate(self.browser.tabs):
                 if contains_point(x, y, self.tab_rect(i)):
-                    self.browser.active_tab = tab
+                    self.browser.set_active_tab(tab)
                     return True
 
     def blur(self):

@@ -1,3 +1,4 @@
+import math
 import time
 import typing
 import urllib.parse
@@ -54,6 +55,7 @@ class Tab:
         self.display_list = []
         self.has_ssl = False
         self.needs_render = False
+        self.scroll_changed_in_tab = False
 
     def is_request_allowed(self, u: URL):
         return not self.allowed_origins or u.origin() in self.allowed_origins
@@ -134,6 +136,7 @@ class Tab:
             self.backward_history.append(input)
         if load_action == LoadAction.NEW:
             self.forward_history = []
+        self.scroll_changed_in_tab = True
         self.scroll_offset = 0
         self.has_ssl = False
         is_view_source = False
@@ -187,29 +190,38 @@ class Tab:
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
+        clamped_scroll = self.clamp_scroll(self.scroll_offset)
+        if clamped_scroll != self.scroll_offset:
+            self.scroll_changed_in_tab = True
+        self.scroll_offset = clamped_scroll
         self.needs_render = False
         self.browser.set_needs_raster_and_draw()
         self.browser.measure.stop('render')
     
-    def run_animation_frame(self):
+    def run_animation_frame(self, scroll = 0):
+        if not self.scroll_changed_in_tab:
+            self.scroll_offset = scroll
         self.js.dispatch_request_animaton_frame_handlers()
         # make sure that this render actually renders
         # not in book but not sure how else this would happen
         self.needs_render = True
         self.render()
 
+        scroll = None
+        if self.scroll_changed_in_tab:
+            scroll = self.scroll_offset
         commit_data = CommitData(
             self.url,
-            self.scroll,
-            self.tab_height,
+            scroll,
+            self.document.height,
             self.display_list,
             len(self.backward_history) > 1,
             len(self.forward_history) > 0,
-            self.has_ssl, 
-            self.document.height
+            self.has_ssl 
         )
         self.display_list = []
         self.browser.commit(self, commit_data)
+        self.scroll_changed_in_tab = False
 
     def request_from_cache(self, url: URL) -> tuple[str, int, dict[str, str]] | None:
         if url in self.cache:
@@ -251,11 +263,14 @@ class Tab:
             return
         destination = layout_y[0]
         offset = abs(self.scroll_offset - destination)
-        self.scroll(-offset if self.scroll_offset > destination else offset)
+        self.scroll_changed_in_tab = True
+        self.scroll_offset = -offset if self.scroll_offset > destination else offset
+        self.run_animation_frame()
 
-    def scroll(self, offset):
-        max_y = max(self.document.height + VSTEP - self.tab_height, 0)
-        self.scroll_offset = min(max(0, self.scroll_offset + offset), max_y)
+    def clamp_scroll(self, scroll):
+        height = math.ceil(self.document.height + (2 * VSTEP))
+        maxscroll = height - self.tab_height
+        return max(0, min(scroll, maxscroll))
 
     def blur(self):
         if self.focus:
